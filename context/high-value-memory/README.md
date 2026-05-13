@@ -1,27 +1,28 @@
-# Memorias de Alto Valor
+# Memorias de Alto Valor — SistemaCustodias
 
-Este directorio guarda memorias de alto valor que deben vivir dentro del repositorio.
+Directorio de memorias durables entre sesiones. Ver estrategia completa en `context/STRATEGY.md`.
 
-Objetivo:
-- Preservar decisiones y lecciones que impactan entregas futuras.
-- Evitar perder contexto cuando cambia la sesión o el agente.
-- Mantener trazabilidad en Git para auditoria del proyecto.
+## Índice de memorias activas
 
-Reglas:
-- Guardar solo informacion durable y reutilizable.
-- Escribir en espanol latino para lectura humana.
-- Mantener entradas breves y accionables.
-- No guardar secretos, tokens, credenciales ni datos personales.
+| Archivo | Contenido | Última actualización |
+|---|---|---|
+| `architecture-decisions.md` | Decisiones técnicas no-obvias con su razón | 2026-05-13 |
+| `recurring-issues.md` | Bugs que vuelven + su fix validado | 2026-05-13 |
+| `integration-contracts.md` | Contratos no-obvios entre módulos | 2026-05-13 |
+| `workflows-and-commands.md` | Comandos CLI validados del proyecto | 2026-05-13 |
 
-Estructura:
-- architecture-decisions.md: decisiones tecnicas y trade-offs importantes.
-- recurring-issues.md: bugs recurrentes, causa raiz y fix estable.
-- workflows-and-commands.md: comandos y flujos validados del proyecto.
-- integration-contracts.md: formas de respuesta y contratos clave entre modulos.
+## Reglas (resumen rápido)
 
-Formato sugerido por entrada:
-- Fecha: YYYY-MM-DD
-- Contexto: modulo o flujo
-- Hecho validado: que se comprobo
-- Impacto: por que importa
-- Accion futura: como reusar o prevenir regresion
+- Cada entrada: **≤ 5 líneas** (contexto + decisión + razón + cuándo aplicar)
+- Cada archivo: **≤ 50 líneas activas**
+- Solo lo que **sorprendería** a un agente que no estuvo en la sesión
+- Ver `context/STRATEGY.md` para el formato completo y taxonomía
+
+## Cuándo escribir aquí
+
+```
+¿Volvió a aparecer un bug? → recurring-issues.md
+¿Dos módulos se comunican de forma no-obvia? → integration-contracts.md
+¿Tomé una decisión que parece inconsistente pero tiene razón? → architecture-decisions.md
+¿Descubrí un comando que no está en docs? → workflows-and-commands.md
+```

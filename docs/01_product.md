@@ -1,170 +1,206 @@
-# Product — Plataforma Tipo UBER Multi-Vertical
+# Product — SistemaCustodias
 
-## Visión
-
-Plataforma de movilidad y servicios bajo demanda construida sobre una base técnica reutilizable, orientada a múltiples verticales de negocio. El diseño permite lanzar nuevos verticales sin reescribir el núcleo.
+Documento de producto para el sistema de custodia de valores. Ver versión compacta en `steering/product.md`.
 
 ---
 
-## Verticales
+## Qué es
 
-| Vertical | Estado | Descripción |
-|---|---|---|
-| Taxi | MVP activo | Servicio de transporte punto a punto |
-| Delivery | Fase 4 | Entrega de paquetes y comida |
-| Custodia | Fase 4 | Acompañamiento y seguridad personal |
+Plataforma digital para la gestión completa de servicios de custodia de valores: solicitud, aprobación supervisada, asignación de equipo, seguimiento GPS en tiempo real, cadena de custodia digital y documentación regulatoria.
 
 ---
 
-## Actores del Sistema
+## Actores y motivaciones
 
-| Actor | Descripción | App |
-|---|---|---|
-| Pasajero | Solicita y paga el servicio | Mobile (iOS/Android) |
-| Conductor | Acepta y ejecuta el servicio | Mobile (iOS/Android) |
-| Administrador | Opera y configura la plataforma | Web (Panel Admin) |
+### Cliente
+Empresa o persona que necesita transportar valores de forma segura.
+- **Solicita** el servicio desde la app o web
+- **Declara** el tipo y valor de lo que transporta
+- **Firma digitalmente** al entregar el cargo al equipo
+- **Hace seguimiento** en tiempo real desde la app
 
----
+**Pain point actual:** Coordinación por teléfono, sin visibilidad, sin evidencia digital.
 
-## Mercado Inicial
+### Custodio
+Operador principal de la unidad de transporte seguro.
+- Recibe la asignación en la app
+- Confirma y ejecuta el servicio
+- Registra cada etapa (llegada, carga, entrega)
+- Activa botón de pánico ante incidentes
 
-| Variable | Valor |
-|---|---|
-| País | México |
-| Moneda | MXN |
-| Idioma | Español |
-| Impuesto | IVA 16% |
-| Pagos MVP | Tarjeta vía Stripe |
-| Expansión | LATAM (Colombia, Brasil) en Fase 4 |
+**Pain point actual:** Instrucciones por radio, sin registro formal, sin respaldo ante incidentes.
 
----
+### Copiloto
+Acompañante de seguridad de la unidad. Parte obligatoria del equipo (regla dos-personas).
+- Confirma la asignación independientemente del custodio
+- Co-responsable del cargo durante el tránsito
+- Puede activar alertas de seguridad
 
-## Tipos de Servicio (Taxi)
+### Despachador
+Operador central que coordina los servicios.
+- Crea órdenes en nombre del cliente si es necesario
+- Asigna equipos disponibles (custodio + copiloto)
+- Monitorea todas las unidades activas en el mapa
+- Responde a alertas de nivel medio
 
-| Tipo | Descripción | Capacidad |
-|---|---|---|
-| Basic | Vehículo estándar | 4 personas |
-| Plus | Vehículo confort | 4 personas |
-| Premium | Vehículo ejecutivo | 4 personas |
-
-Los tipos son configurables desde el panel admin. Cada tipo tiene tarifa base, costo por km y costo por minuto independientes.
-
----
-
-## Ciclo de Vida del Viaje
-
-```
-REQUESTED → SEARCHING → ACCEPTED → DRIVER_EN_ROUTE
-→ DRIVER_ARRIVED → IN_PROGRESS → COMPLETED
-```
-
-Estados de cancelación: `CANCELLED_BY_PASSENGER`, `CANCELLED_BY_DRIVER`, `CANCELLED_NO_DRIVER`, `NO_SHOW`
+### Supervisor
+Responsable de la operación y cumplimiento.
+- Aprueba o rechaza órdenes antes de ejecutarse
+- Responde a alertas críticas (botón de pánico)
+- Puede suspender operadores
+- Descarga reportes de cadena de custodia para auditorías
 
 ---
 
-## Funcionalidades MVP
+## Tipos de custodia (MVP)
 
-### Pasajero
-- Registro y verificación por OTP (teléfono)
-- Cotización de viaje antes de confirmar
-- Solicitud de viaje inmediato o programado
-- Seguimiento del conductor en tiempo real
-- Pago con tarjeta guardada
-- Historial de viajes
-- Calificación del conductor
+Diseñados para ser extensibles sin código adicional (ADR-004).
 
-### Conductor
-- Registro con documentos verificables
-- Activación/desactivación de disponibilidad
-- Recepción de solicitudes con tiempo límite de aceptación
-- Navegación integrada
-- Historial de viajes y ganancias
-- Calificación del pasajero
+### `cash_transport` — Transporte de efectivo
+Efectivo, cheques, billetes, documentos bancarios.
 
-### Administrador
-- Dashboard en tiempo real (viajes, conductores, KPIs)
-- Revisión y aprobación de documentos de conductores
-- Gestión de incidentes y viajes problemáticos
-- Configuración de tarifas y factores de precio
-- Gestión de errores y pagos fallidos
-
----
-
-## Modelo de Monetización
-
-```
-Tarifa del viaje
-  − Comisión de plataforma   (configurable por tipo de viaje)
-  = Ganancia neta del conductor
-  + IVA 16%
-  ═ Total cobrado al pasajero
+Declaración requerida:
+```json
+{
+  "amount_mxn": 500000,
+  "currency": "MXN",
+  "denomination_breakdown": { "1000": 100, "500": 500, "200": 250 }
+}
 ```
 
-La comisión es configurable desde el panel admin por región y tipo de viaje, sin necesidad de redeploy.
+### `high_value_package` — Paquetería de alto valor
+Joyería, electrónicos, mercancía costosa.
+
+Declaración requerida:
+```json
+{
+  "description": "Relojes Rolex modelo Datejust x3",
+  "estimated_value_mxn": 750000,
+  "insurance_required": true,
+  "insurance_policy_id": "POL-2026-00123"
+}
+```
+
+### `confidential_docs` — Documentos confidenciales
+Documentos legales, notariales, corporativos, expedientes.
+
+Declaración requerida:
+```json
+{
+  "document_type": "escritura_notarial",
+  "issuing_entity": "Notaria 45 CDMX",
+  "sensitivity_level": "high",
+  "document_count": 3
+}
+```
+
+### `vip_escort` — Escolta de personas
+Protección y acompañamiento de personas VIP o en riesgo.
+
+Declaración requerida:
+```json
+{
+  "person_name": "Nombre Apellido",
+  "threat_level": "medium",
+  "route_restrictions": ["avoid_highway_15", "no_tunnels"],
+  "contact_emergency": "+52 55 1234 5678"
+}
+```
 
 ---
 
-## Viajes Programados
+## Flujo principal de una orden
 
-El pasajero puede agendar un viaje con anticipación. El sistema notifica al conductor asignado en tres momentos:
-- 24 horas antes
-- 1 hora antes
-- 15 minutos antes
+### Fase 1: Solicitud
+```
+Cliente o Despachador
+  → Crea orden (DRAFT)
+  → Selecciona tipo de custodia
+  → Llena declaración de valores (schema según tipo)
+  → Define origen, destino y ventana de tiempo
+  → Envía a aprobación (PENDING_APPROVAL)
+```
 
-Si el conductor no responde o se desconecta, el sistema reasigna automáticamente.
+### Fase 2: Aprobación
+```
+Supervisor
+  → Recibe notificación (push + SMS)
+  → Revisa declaración de valores y ruta
+  → Aprueba (APPROVED) → se congela pricing_snapshot
+  → O rechaza con motivo obligatorio (REJECTED)
+```
+
+### Fase 3: Asignación
+```
+Despachador
+  → Ve órdenes en APPROVED
+  → Selecciona custodio disponible + copiloto disponible
+  → Asigna (ASSIGNED)
+
+Custodio (en app)
+  → Recibe notificación
+  → Revisa detalles de la orden
+  → Acepta (contribuye a CREW_CONFIRMED)
+
+Copiloto (en app)
+  → Recibe notificación independiente
+  → Acepta (completa CREW_CONFIRMED)
+```
+
+### Fase 4: Ejecución
+```
+Custodio/Copiloto (en app)
+  → Marca salida hacia pickup (EN_ROUTE_TO_PICKUP)
+  → GPS tracking activo — visible en dashboard y app del cliente
+  → Llega al punto de recolección (AT_PICKUP)
+  → Cliente firma digitalmente en la pantalla del custodio
+  → Carga el cargo (IN_TRANSIT) → se genera custody_snapshot inmutable
+
+  [Durante IN_TRANSIT]
+  → GPS tracking continuo
+  → Verificación automática de geocerca
+  → Botón de pánico siempre visible
+
+  → Llega al destino (AT_DELIVERY)
+  → Receptor firma digitalmente
+  → Entrega completada (DELIVERED)
+```
+
+### Fase 5: Cierre
+```
+Sistema/Despachador
+  → Cierra la orden (COMPLETED)
+  → Se procesa el pago
+  → Se genera reporte de cadena de custodia (PDF descargable)
+```
 
 ---
 
-## Fases del Producto
+## Principios de UX
 
-### Fase 1 — MVP Taxi (3-4 meses)
-Auth, ciclo completo de viaje, tracking en tiempo real, pago con tarjeta, panel admin básico.
+### Para operadores (custodio/copiloto)
+1. **Fluidez en campo** — Botones grandes, acciones claras, sin lecturas largas
+2. **Pánico nunca oculto** — El botón de pánico es rojo, grande, siempre visible en orden activa
+3. **Firma rápida** — Canvas con dedo en pantalla táctil — no requiere hardware adicional
+4. **Offline-first** — Las acciones se encolan si hay pérdida de señal y se sincronizan
 
-### Fase 2 — Estabilización (1-2 meses)
-Historial de rutas, viajes programados, sistema de rating, notificaciones push y SMS, métricas operacionales.
+### Para clientes
+1. **Visibilidad total** — Saben en todo momento dónde está su cargo
+2. **Historial claro** — Pueden ver cada etapa de la orden con timestamps
+3. **Notificaciones útiles** — Alertas en momentos clave, no spam
 
-### Fase 3 — Inteligencia (al tener datos)
-Matching inteligente por ML, precios dinámicos por demanda real, detección de anomalías, predicción de demanda por zona.
-
-### Fase 4 — Nuevos Verticales
-Delivery, custodia, expansión a Colombia y Brasil.
-
----
-
-## Motor de Precios Dinámico
-
-El precio se calcula en tiempo de ejecución evaluando factores configurables. No hay valores hardcoded.
-
-### Categorías de factores
-- **Climáticos:** lluvia, calor extremo, neblina
-- **Temporales:** hora pico, nocturno, festivo
-- **Demanda:** alta demanda por zona
-- **Distancia:** viaje largo, mínimo por viaje corto
-- **Servicios extra:** parada adicional, mascotas, equipaje
-
-### Tipos de factor
-| Tipo | Ejemplo |
-|---|---|
-| `multiplier` | Lluvia: ×1.20 |
-| `fixed_amount` | Parada extra: +$15 |
-| `percentage` | Hora pico: +10% |
+### Para despachadores y supervisores
+1. **Mapa en tiempo real** — Todas las unidades activas visibles simultáneamente
+2. **Acciones en contexto** — Aprobar, asignar y responder alertas sin cambiar de pantalla
+3. **Reportes accesibles** — Cadena de custodia descargable en un clic
 
 ---
 
-## Onboarding del Conductor
+## Roadmap de tipos de custodia
 
-### Estados del conductor
-`pending` → `documents_submitted` → `under_review` → `approved`
+Los siguientes tipos están en el backlog para sprints futuros:
+- `cold_chain` — Transporte refrigerado (medicamentos, alimentos sensibles)
+- `hazmat_transport` — Materiales peligrosos con protocolos especiales
+- `vehicle_escort` — Escolta de vehículos de valor
 
-Con posibilidad de `suspended` o `banned` en cualquier momento.
-
-### Documentos requeridos (México)
-Configurables dinámicamente desde el panel admin. Ejemplos:
-- Licencia de conducir vigente
-- INE / identificación oficial
-- Tarjeta de circulación
-- Póliza de seguro del vehículo
-- Verificación de antecedentes
-
-### Regla de documentos vencidos
-Si un documento vence con un viaje activo en curso, el conductor termina el viaje y luego es suspendido automáticamente. No se interrumpe el viaje en curso.
+Agregar cualquiera de estos = INSERT en `custody_types` + configurar el JSON Schema de la declaración.
