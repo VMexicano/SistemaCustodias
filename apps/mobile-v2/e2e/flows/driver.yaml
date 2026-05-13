@@ -1,0 +1,38 @@
+appId: com.ridebase
+---
+# Setup: login como conductor
+- launchApp:
+    clearState: true
+
+- assertVisible:
+    id: "login-phone-input"
+- tapOn:
+    id: "login-phone-input"
+- inputText: "+525500000002"
+- tapOn:
+    id: "login-send-otp-btn"
+- assertVisible:
+    id: "login-otp-input"
+- tapOn:
+    id: "login-otp-input"
+- inputText: "123456"
+- tapOn:
+    id: "login-verify-btn"
+
+# OnlineScreen: verificar estado inicial (offline)
+- assertVisible:
+    id: "driver-online-screen"
+- assertVisible:
+    id: "driver-status-offline"
+
+# Toggle online: conductor se pone disponible
+- tapOn:
+    id: "driver-online-switch"
+- assertVisible:
+    id: "driver-status-online"
+
+# Toggle offline: conductor se pone no disponible
+- tapOn:
+    id: "driver-online-switch"
+- assertVisible:
+    id: "driver-status-offline"

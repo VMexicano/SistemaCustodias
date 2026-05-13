@@ -1,0 +1,53 @@
+appId: com.ridebase
+---
+# Setup: login como pasajero
+- launchApp:
+    clearState: true
+
+- assertVisible:
+    id: "login-phone-input"
+- tapOn:
+    id: "login-phone-input"
+- inputText: "+525500000001"
+- tapOn:
+    id: "login-send-otp-btn"
+- assertVisible:
+    id: "login-otp-input"
+- tapOn:
+    id: "login-otp-input"
+- inputText: "123456"
+- tapOn:
+    id: "login-verify-btn"
+
+# HomeScreen: visible, ingresar destino y solicitar
+- assertVisible:
+    id: "home-map"
+- tapOn:
+    id: "home-dest-input"
+- inputText: "Aeropuerto AICM"
+- tapOn:
+    id: "home-request-btn"
+
+# EstimateScreen: seleccionar tipo de viaje y esperar tarifa
+- assertVisible:
+    id: "estimate-screen"
+- tapOn:
+    id: "estimate-card-0"
+
+- assertVisible:
+    id: "estimate-total"
+
+- tapOn:
+    id: "estimate-confirm-btn"
+
+# ActiveTripScreen: visible, cancelar viaje
+- assertVisible:
+    id: "active-trip-screen"
+- assertVisible:
+    id: "active-trip-cancel-btn"
+- tapOn:
+    id: "active-trip-cancel-btn"
+
+# Regresar a HomeScreen
+- assertVisible:
+    id: "home-map"

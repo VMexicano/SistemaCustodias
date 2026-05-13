@@ -1,0 +1,106 @@
+appId: com.ridebase
+---
+# approval-flow.yaml — Flujo: Aprobación B2B
+#
+# Pre-condición: API corriendo con VERTICAL_SLUG=custody (requiresApproval=true)
+#                Seed 07: pasajero +525500000001, conductor +525500000002
+#                Seed 08: admin / Admin1234!
+#
+# Pasos:
+#   1. Pasajero inicia sesión y solicita viaje → llega a ActiveTripScreen
+#   2. Banner PENDING_APPROVAL (naranja) visible → botón cancelar OCULTO
+#   3. El test invoca el endpoint /trips/:id/approve via runScript para simular
+#      que el admin aprueba (el emulador no puede abrir el backoffice web)
+#   4. Banner APPROVED (azul) visible → botón cancelar OCULTO
+#
+# Nota: La transición APPROVED → SEARCHING la maneja BullMQ con delay 0s.
+#       Maestro no puede observar eventos de socket, así que el test verifica
+#       los banners que sí son estados estables en la UI mobile.
+
+# -----------------------------------------------------------------------
+# Setup: login como pasajero
+# -----------------------------------------------------------------------
+- launchApp:
+    clearState: true
+
+- assertVisible:
+    id: "login-phone-input"
+- tapOn:
+    id: "login-phone-input"
+- inputText: "+525500000001"
+- tapOn:
+    id: "login-send-otp-btn"
+- assertVisible:
+    id: "login-otp-input"
+- tapOn:
+    id: "login-otp-input"
+- inputText: "123456"
+- tapOn:
+    id: "login-verify-btn"
+
+# -----------------------------------------------------------------------
+# HomeScreen: solicitar viaje
+# -----------------------------------------------------------------------
+- assertVisible:
+    id: "home-map"
+- tapOn:
+    id: "home-dest-input"
+- inputText: "Aeropuerto AICM"
+- tapOn:
+    id: "home-request-btn"
+
+# EstimateScreen: confirmar
+- assertVisible:
+    id: "estimate-screen"
+- tapOn:
+    id: "estimate-card-0"
+- assertVisible:
+    id: "estimate-total"
+- tapOn:
+    id: "estimate-confirm-btn"
+
+# -----------------------------------------------------------------------
+# ActiveTripScreen: banner PENDING_APPROVAL visible
+# -----------------------------------------------------------------------
+- assertVisible:
+    id: "active-trip-screen"
+
+- assertVisible:
+    id: "status-banner-pending-approval"
+
+- assertVisible:
+    id: "pending-activity-indicator"
+
+# Texto de revisión visible
+- assertVisible:
+    text: "Tu solicitud está en revisión"
+
+# Botón cancelar NO visible durante PENDING_APPROVAL
+- assertNotVisible:
+    id: "active-trip-cancel-btn"
+
+# -----------------------------------------------------------------------
+# ActiveTripScreen: banner APPROVED visible
+#
+# Requiere que el admin apruebe el viaje durante la ejecución del flujo.
+# Opciones:
+#   CI: script paralelo llama POST /trips/:id/approve vía API mientras este
+#       flujo espera (orquestación externa al YAML).
+#   Manual: aprobar desde el backoffice web en los 30 segundos de espera.
+#
+# Maestro `assertVisible` reintenta automáticamente hasta el timeout.
+# -----------------------------------------------------------------------
+- assertVisible:
+    id: "status-banner-approved"
+    # Reintenta durante 30 s mientras el admin aprueba externamente
+    timeout: 30000
+
+- assertVisible:
+    id: "approved-activity-indicator"
+
+- assertVisible:
+    text: "Solicitud aprobada"
+
+# Botón cancelar NO visible durante APPROVED
+- assertNotVisible:
+    id: "active-trip-cancel-btn"

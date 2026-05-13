@@ -1,0 +1,459 @@
+<mxfile host="app.diagrams.net" version="24.0.0">
+
+  <!-- ══════════════════════════════════════════════════════
+       PÁGINA 1: AUTENTICACIÓN OTP
+       ══════════════════════════════════════════════════════ -->
+  <diagram id="d-auth" name="1. Autenticación OTP">
+    <mxGraphModel pageWidth="760" pageHeight="780">
+      <root>
+        <mxCell id="0" /><mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Autenticación OTP" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="150" y="5" width="340" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Participantes -->
+        <mxCell id="a-box" value="App Mobile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="20" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="b-box" value="API Fastify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="260" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c-box" value="PostgreSQL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Lifelines -->
+        <mxCell id="a-life" value="" style="endArrow=none;dashed=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="82" as="sourcePoint" /><mxPoint x="100" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b-life" value="" style="endArrow=none;dashed=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="82" as="sourcePoint" /><mxPoint x="340" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c-life" value="" style="endArrow=none;dashed=1;strokeColor=#d6b656;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="82" as="sourcePoint" /><mxPoint x="580" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 1. App → API: POST /auth/login -->
+        <mxCell id="m1" value="1. POST /auth/login { phone }" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="120" as="sourcePoint" /><mxPoint x="340" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 2. API → PG: INSERT otp -->
+        <mxCell id="m2" value="2. INSERT INTO otps (phone, code, expires_at)" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="175" as="sourcePoint" /><mxPoint x="580" y="175" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 3. PG → API: ok -->
+        <mxCell id="m3" value="3. 201 Created" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="220" as="sourcePoint" /><mxPoint x="340" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 4. API → App: 202 -->
+        <mxCell id="m4" value="4. 202 Accepted" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="265" as="sourcePoint" /><mxPoint x="100" y="265" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="n1" value="OTP vía SMS / TEST_OTP_BYPASS=true en dev" style="text;html=1;strokeColor=#FFD966;fillColor=#FFF2CC;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="10" y="280" width="230" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 5. App → API: POST /auth/verify -->
+        <mxCell id="m5" value="5. POST /auth/verify { phone, otp }" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="335" as="sourcePoint" /><mxPoint x="340" y="335" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 6. API → PG: SELECT otp -->
+        <mxCell id="m6" value="6. SELECT * FROM otps WHERE phone=? AND expires &gt; NOW()" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="390" as="sourcePoint" /><mxPoint x="580" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 7. PG → API: otp record -->
+        <mxCell id="m7" value="7. { id, phone, code, expires_at }" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="440" as="sourcePoint" /><mxPoint x="340" y="440" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 8. API → App: 200 tokens -->
+        <mxCell id="m8" value="8. 200 OK { accessToken, refreshToken, role }" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="495" as="sourcePoint" /><mxPoint x="100" y="495" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="n2" value="App persiste tokens en MMKV (cifrado en disco)" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=center;whiteSpace=wrap;rounded=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="10" y="515" width="220" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- 9. Redirect -->
+        <mxCell id="m9" value="9. RootNavigator → HomeScreen (passenger) / OnlineScreen (driver)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="10" y="565" width="430" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- Error path -->
+        <mxCell id="n3" value="⚠ OTP incorrecto → 401 Unauthorized → App muestra &quot;login-error-msg&quot;" style="text;html=1;strokeColor=#ae4132;fillColor=#f8cecc;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="10" y="602" width="320" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Refresh token note -->
+        <mxCell id="n4" value="♻ Si request devuelve 401 después del login → POST /auth/refresh → nuevo accessToken o logout" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="10" y="645" width="430" height="30" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ══════════════════════════════════════════════════════
+       PÁGINA 2: CICLO COMPLETO DEL VIAJE
+       ══════════════════════════════════════════════════════ -->
+  <diagram id="d-trip" name="2. Ciclo Completo del Viaje">
+    <mxGraphModel pageWidth="1050" pageHeight="1220">
+      <root>
+        <mxCell id="0" /><mxCell id="1" parent="0" />
+
+        <mxCell id="t2" value="Solicitud y Ciclo de Vida del Viaje" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="5" width="500" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Participantes — centers: Pasajero=100, API=310, PG=520, Conductor=760 -->
+        <mxCell id="p1" value="App Pasajero" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="20" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" value="API Fastify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="230" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" value="PostgreSQL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p4" value="App Conductor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Lifelines -->
+        <mxCell id="l1" value="" style="endArrow=none;dashed=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="82" as="sourcePoint" /><mxPoint x="100" y="1200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="l2" value="" style="endArrow=none;dashed=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="82" as="sourcePoint" /><mxPoint x="310" y="1200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="l3" value="" style="endArrow=none;dashed=1;strokeColor=#d6b656;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="82" as="sourcePoint" /><mxPoint x="520" y="1200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="l4" value="" style="endArrow=none;dashed=1;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="760" y="82" as="sourcePoint" /><mxPoint x="760" y="1200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ── FASE 1: ESTIMATE ── -->
+        <mxCell id="f1" value="FASE 1: Estimación de precio" style="text;html=1;strokeColor=#d6b656;fillColor=#fff2cc;align=left;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="100" width="240" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tm1" value="1. POST /trips/estimate { origin, destination }" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="130" as="sourcePoint" /><mxPoint x="310" y="130" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm2" value="2. SELECT * FROM pricing_rules WHERE active=true" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="178" as="sourcePoint" /><mxPoint x="520" y="178" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm3" value="3. [{ type, base_fare, per_km, multiplier }]" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="222" as="sourcePoint" /><mxPoint x="310" y="222" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm4" value="4. 200 OK [{ type, totalPrice, eta, currency }]" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="266" as="sourcePoint" /><mxPoint x="100" y="266" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ── FASE 2: CREAR VIAJE ── -->
+        <mxCell id="f2" value="FASE 2: Crear Viaje" style="text;html=1;strokeColor=#d6b656;fillColor=#fff2cc;align=left;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="300" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tm5" value="5. POST /trips { type, origin, destination }" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="330" as="sourcePoint" /><mxPoint x="310" y="330" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm6" value="6. INSERT INTO trips (status=&apos;pending&apos;, passenger_id, pricing_snapshot)" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="378" as="sourcePoint" /><mxPoint x="520" y="378" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm7" value="7. { tripId, status: &apos;pending&apos; }" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="422" as="sourcePoint" /><mxPoint x="310" y="422" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm8" value="8. emit &quot;trip:request&quot; (WebSocket — async)" style="html=1;endArrow=open;endFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="465" as="sourcePoint" /><mxPoint x="760" y="465" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm8b" value="8b. 201 Created { tripId }" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="500" as="sourcePoint" /><mxPoint x="100" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ── FASE 3: ACEPTACIÓN ── -->
+        <mxCell id="f3" value="FASE 3: Aceptación del conductor" style="text;html=1;strokeColor=#d6b656;fillColor=#fff2cc;align=left;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="535" width="280" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tm9" value="9. POST /trips/:id/accept" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="760" y="565" as="sourcePoint" /><mxPoint x="310" y="565" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm10" value="10. UPDATE trips SET status=&apos;accepted&apos;, driver_id=?" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="610" as="sourcePoint" /><mxPoint x="520" y="610" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm11" value="11. ok" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="650" as="sourcePoint" /><mxPoint x="310" y="650" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm12" value="12. emit &quot;trip:accepted&quot; { driverId, driverName } (WebSocket)" style="html=1;endArrow=open;endFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="690" as="sourcePoint" /><mxPoint x="100" y="690" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ── FASE 4: TRACKING GPS ── -->
+        <mxCell id="f4" value="FASE 4: Tracking GPS en tiempo real (cada 5 s)" style="text;html=1;strokeColor=#d6b656;fillColor=#fff2cc;align=left;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="725" width="360" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tm13" value="13. emit &quot;driver:location&quot; { tripId, lat, lng } (WebSocket)" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="760" y="755" as="sourcePoint" /><mxPoint x="310" y="755" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm14" value="14. emit &quot;trip:driver_location&quot; { lat, lng } (WebSocket)" style="html=1;endArrow=open;endFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="795" as="sourcePoint" /><mxPoint x="100" y="795" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="nloop" value="↺ Pasos 13-14 se repiten cada 5 s hasta completar o cancelar" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="195" y="815" width="360" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ── FASE 5: COMPLETAR ── -->
+        <mxCell id="f5" value="FASE 5: Completar Viaje" style="text;html=1;strokeColor=#d6b656;fillColor=#fff2cc;align=left;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="858" width="220" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tm15" value="15. PATCH /trips/:id/complete" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="760" y="888" as="sourcePoint" /><mxPoint x="310" y="888" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm16" value="16. UPDATE trips SET status=&apos;completed&apos;, completed_at=NOW()" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="932" as="sourcePoint" /><mxPoint x="520" y="932" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm17" value="17. emit &quot;trip:completed&quot; → App Pasajero (WebSocket)" style="html=1;endArrow=open;endFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="976" as="sourcePoint" /><mxPoint x="100" y="976" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tm18" value="18. emit &quot;trip:completed&quot; → App Conductor (WebSocket)" style="html=1;endArrow=open;endFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="1015" as="sourcePoint" /><mxPoint x="760" y="1015" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="nav1" value="→ HomeScreen" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1040" width="120" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="nav2" value="→ OnlineScreen" style="text;html=1;strokeColor=#9673a6;fillColor=#e1d5e7;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="685" y="1040" width="140" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Cancelación alternativa -->
+        <mxCell id="ncancel" value="⚠ Cancelación: DELETE /trips/:id (solo en status=pending/accepted) → emit trip:cancelled a ambos → ambos regresan a Home/Online" style="text;html=1;strokeColor=#ae4132;fillColor=#f8cecc;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="10" y="1080" width="620" height="35" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ══════════════════════════════════════════════════════
+       PÁGINA 3: BACKGROUND GPS — CONDUCTOR EN VIAJE
+       ══════════════════════════════════════════════════════ -->
+  <diagram id="d-gps" name="3. Background GPS Conductor">
+    <mxGraphModel pageWidth="900" pageHeight="780">
+      <root>
+        <mxCell id="0" /><mxCell id="1" parent="0" />
+
+        <mxCell id="t3" value="Background GPS — Conductor en viaje activo" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="130" y="5" width="550" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Participantes — centers: Conductor=100, expo-location=300, API WS=550, App Pasajero=780 -->
+        <mxCell id="g1" value="App Conductor&#xa;(background)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" value="expo-location&#xa;+ expo-task-manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="220" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" value="API WebSocket&#xa;+ Redis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="470" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="g4" value="App Pasajero" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="700" y="32" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Lifelines -->
+        <mxCell id="gl1" value="" style="endArrow=none;dashed=1;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="82" as="sourcePoint" /><mxPoint x="100" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gl2" value="" style="endArrow=none;dashed=1;strokeColor=#b85450;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="82" as="sourcePoint" /><mxPoint x="300" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gl3" value="" style="endArrow=none;dashed=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="82" as="sourcePoint" /><mxPoint x="550" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gl4" value="" style="endArrow=none;dashed=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="780" y="82" as="sourcePoint" /><mxPoint x="780" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Precondición -->
+        <mxCell id="gpre" value="[Viaje aceptado — ver diagrama 2, paso 9]" style="text;html=1;strokeColor=#9673a6;fillColor=#e1d5e7;align=center;whiteSpace=wrap;rounded=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="10" y="100" width="270" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- 1. startTracking -->
+        <mxCell id="gm1" value="1. LocationService.startTracking(tripId)" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="145" as="sourcePoint" /><mxPoint x="300" y="145" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 2. requestBackgroundPermissions -->
+        <mxCell id="gm2" value="2. requestBackgroundPermissionsAsync() — dialog al usuario" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="190" as="sourcePoint" /><mxPoint x="100" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gm2b" value="2b. &quot;Permitir siempre&quot; — granted" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="230" as="sourcePoint" /><mxPoint x="300" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 3. startLocationUpdatesAsync -->
+        <mxCell id="gm3" value="3. startLocationUpdatesAsync(LOCATION_TASK, { accuracy: High, distanceInterval: 10m, timeInterval: 5000, foregroundService: {...} })" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="275" as="sourcePoint" /><mxPoint x="300" y="275" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="gn1" value="Android: ForegroundService activo&#xa;Notificación persistente en status bar" style="text;html=1;strokeColor=#b85450;fillColor=#f8cecc;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="215" y="298" width="200" height="38" as="geometry" />
+        </mxCell>
+
+        <!-- Loop label -->
+        <mxCell id="gloop" value="↺  LOOP — Android OS dispara LOCATION_TASK cada 5 s (pantalla apagada, app en background)" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=center;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="358" width="600" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 4. Task fires -->
+        <mxCell id="gm4" value="4. LOCATION_TASK fires { locations: [{ lat, lng, speed, bearing }] }" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#b85450;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="405" as="sourcePoint" /><mxPoint x="100" y="405" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 5. emit driver:location -->
+        <mxCell id="gm5" value="5. socketClient.emit(&quot;driver:location&quot;, { tripId, lat, lng })" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="455" as="sourcePoint" /><mxPoint x="550" y="455" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 6. API → Redis publish -->
+        <mxCell id="gm6" value="6. Redis PUBLISH trip:{id}:location { lat, lng }" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="500" as="sourcePoint" /><mxPoint x="550" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gm6-note" value="API recibe evento → Redis PUBLISH (pub/sub entre instancias)" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="460" y="480" width="260" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- 7. emit trip:driver_location to pasajero -->
+        <mxCell id="gm7" value="7. emit &quot;trip:driver_location&quot; { lat, lng } (WebSocket)" style="html=1;endArrow=open;endFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="530" as="sourcePoint" /><mxPoint x="780" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gm7-note" value="Pasajero actualiza marcador del conductor en mapa (ActiveTripScreen)" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="660" y="548" width="210" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- Offline queue branch -->
+        <mxCell id="goffline" value="⚠ Si Socket desconectado: coords se encolan en MMKV. Al reconectar → replay automático de la cola." style="text;html=1;strokeColor=#b85450;fillColor=#f8cecc;align=center;whiteSpace=wrap;rounded=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="10" y="595" width="430" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- Stop tracking -->
+        <mxCell id="gstop-label" value="Al completar o cancelar viaje:" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="652" width="220" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="gm8" value="8. LocationService.stopTracking()" style="html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="682" as="sourcePoint" /><mxPoint x="300" y="682" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gm9" value="9. stopLocationUpdatesAsync(LOCATION_TASK) — ForegroundService termina" style="html=1;endArrow=open;endFill=0;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="718" as="sourcePoint" /><mxPoint x="100" y="718" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+</mxfile>

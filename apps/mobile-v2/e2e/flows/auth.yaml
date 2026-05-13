@@ -1,0 +1,38 @@
+appId: com.ridebase
+---
+# Flujo 1: OTP incorrecto muestra mensaje de error
+- launchApp:
+    clearState: true
+
+- assertVisible:
+    id: "login-phone-input"
+
+- tapOn:
+    id: "login-phone-input"
+- inputText: "+525500000001"
+
+- tapOn:
+    id: "login-send-otp-btn"
+
+- assertVisible:
+    id: "login-otp-input"
+
+- tapOn:
+    id: "login-otp-input"
+- inputText: "000000"
+
+- tapOn:
+    id: "login-verify-btn"
+
+- assertVisible:
+    id: "login-error-msg"
+
+# Flujo 2: OTP correcto navega a HomeScreen
+- eraseText: 6
+- inputText: "123456"
+
+- tapOn:
+    id: "login-verify-btn"
+
+- assertVisible:
+    id: "home-map"
