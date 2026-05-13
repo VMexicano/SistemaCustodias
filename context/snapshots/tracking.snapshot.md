@@ -1,77 +1,96 @@
-# Snapshot — Módulo: tracking
-> Última actualización: 2026-05-07 | Estado: ✅ Completo (Sprint 7)
+# Snapshot: tracking
+> GPS tiempo real — TimescaleDB, WebSocket, geocerca.
+> Última actualización: 2026-05-13 — Sprint 0
 
-## Estado
-- Implementación: 100%
-- Integrado en app.ts: ✅
-- Migration 030: device_tokens ✅
+---
 
-## Responsabilidad
-GPS en tiempo real (Redis), persistencia histórica (TimescaleDB), tokens de push (FCM).
-
-## Archivos implementados
+## Archivo(s) principal(es)
 
 ```
 apps/api/src/modules/tracking/
-├── tracking.routes.ts       ← GET /trips/:id/track
-├── tracking.service.ts      ← recordLocation + getTripLocations
-└── tracking.repository.ts   ← INSERT trip_locations (TimescaleDB) + device_tokens UPSERT
-
-apps/api/src/modules/users/
-└── device-token.routes.ts   ← POST /users/me/device-token
+  tracking.routes.ts
+  tracking.controller.ts
+  tracking.service.ts
+  tracking.repository.ts
+  tracking.types.ts
+  geofence.utils.ts
 ```
+
+---
+
+## Flujo de tracking
+
+```
+App operador (cada 10s durante orden activa)
+  → POST /tracking/location  { order_id, lat, lng, speed, heading, accuracy }
+  → TimescaleDB hypertable: location_readings
+  → WebSocket broadcast → dashboard admin (mapa en tiempo real)
+  → Verificación de geocerca → si viola → POST /alerts automático
+```
+
+---
 
 ## Endpoints
 
-| Método | Path | Auth | Descripción |
+| Método | Ruta | Actor | Descripción |
 |---|---|---|---|
-| GET | /trips/:id/track | JWT (pasajero del viaje, conductor del viaje, o admin) | Historial de ubicaciones GPS del viaje |
-| POST | /users/me/device-token | JWT | Registrar/actualizar FCM token del dispositivo |
+| POST | `/tracking/location` | custodio, copiloto | Enviar lectura GPS |
+| GET | `/tracking/:orderId/current` | dispatcher, supervisor, client | Ubicación actual del equipo |
+| GET | `/tracking/:orderId/history` | dispatcher, supervisor | Historial de ruta (TimescaleDB) |
+| GET | `/tracking/:orderId/route` | dispatcher, supervisor | Ruta declarada vs ruta real |
 
-## Flujo GPS
+---
 
-```
-Conductor → PATCH /drivers/me/location (desde mobile, cada 5s)
-  → DriversService.updateLocation()
-  → trackingService.recordLocation() → INSERT trip_locations (TimescaleDB)
-  → Redis: SET driver:{id}:location HSET { lat, lng, updatedAt }  TTL 5 min
-  → Socket.io emit trip:driver_location_updated a room trip:{id}
-```
-
-## Redis keys
-
-```
-driver:{id}:location    HSET { lat, lng, updatedAt }  TTL 5 min
-```
-
-## Tabla trip_locations (TimescaleDB hypertable)
+## TimescaleDB hypertable
 
 ```sql
-trip_id UUID FK · driver_id UUID FK · lat DECIMAL · lng DECIMAL · recorded_at TIMESTAMPTZ
--- Migration 015 (Sprint 1): hypertable particionada por día
--- Retención: 90 días (R-DATA-003)
--- Compresión automática: datos > 7 días
--- Índice: (trip_id, recorded_at DESC)
+-- Convertir a hypertable después de crear la tabla
+SELECT create_hypertable('location_readings', 'time');
+
+-- Índice compuesto para queries de orden activa
+CREATE INDEX ON location_readings (order_id, time DESC);
 ```
 
-## Tabla device_tokens
+Retención de datos: 90 días por defecto, configurable.
 
-```sql
-id UUID PK · user_id UUID FK · token TEXT · platform VARCHAR(10) · created_at · updated_at
--- Migration 030 (Sprint 7)
--- UPSERT por (user_id, platform)
+---
+
+## WebSocket (Socket.io)
+
+- Namespace: `/tracking`
+- Room por orden: `order:{order_id}`
+- El despachador/supervisor se une al room al abrir la pantalla de la orden
+- El cliente se une al room de su propia orden para ver la ubicación del equipo
+- Evento emitido: `location:updated` con `{ order_id, lat, lng, speed, heading, timestamp }`
+
+---
+
+## Geocerca
+
+```typescript
+// Verifica si el punto está fuera del corredor de la ruta declarada
+function isOutsideRoute(point: Point, route: Polyline, thresholdMeters: number): boolean
+
+// Distancia haversine
+function haversineDistance(p1: Point, p2: Point): number  // metros
 ```
 
-## WebSocket events relacionados
+El threshold por tipo de custodia es configurable en `custody_types.value_declaration_schema`.
+Default: 500 metros.
 
-```
-trip:driver_location_updated  → { driverId, lat, lng, updatedAt }
-                              → emitido a room trip:{id} (pasajero + conductor)
-```
+---
 
-## Integración mobile
+## Reglas
 
-`location.service.ts` en `apps/mobile-v2/`:
-- `watchPosition` cada 5s vía `expo-location`
-- Cola offline en MMKV (máx 100 puntos)
-- Flush al reconectar con timestamps originales
+1. Solo se registran lecturas para órdenes en estado `EN_ROUTE_TO_PICKUP` o `IN_TRANSIT`
+2. Si una lectura llega para una orden en otro estado → se ignora silenciosamente
+3. La verificación de geocerca se hace en BullMQ (job async) — no bloquea el endpoint
+4. Si no llega lectura en > 2 minutos durante IN_TRANSIT → alerta `communication_loss`
+
+---
+
+## Dependencias entre módulos
+
+- `custody-orders` — Solo trackea órdenes activas
+- `alerts` — Geocerca violation → POST /alerts automático
+- Emite eventos WebSocket al dashboard (admin)

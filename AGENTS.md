@@ -1,338 +1,228 @@
-# AGENTS.md — Arquitectura Multi-Agente
+# AGENTS.md — Arquitectura Multi-Agente SistemaCustodias
 
-> Define los agentes disponibles en este proyecto, sus responsabilidades,
-> el contexto que cada uno lee, y el protocolo de coordinación entre ellos.
+> Define los agentes disponibles, sus responsabilidades, el contexto que cada uno lee,
+> y el protocolo de coordinación entre ellos.
 > Los agentes se comunican exclusivamente a través de archivos — no hay llamadas directas.
-
----
-
-## Preferencias del usuario
-
-### Idioma
-
-| Contexto | Idioma | Ejemplos |
-|---|---|---|
-| Conversaciones con el usuario | **Español latino** | Respuestas, preguntas, explicaciones, feedback |
-| Documentación del proyecto | **Español latino** | Todos los archivos `.md` de docs/, steering/, context/, agents/ |
-| Código fuente | **Inglés** | Nombres de variables, funciones, clases, constantes |
-| Comentarios en código | **Inglés** | Inline comments, JSDoc |
-| Commits y PRs | **Inglés** | Mensajes de commit, títulos y descripciones de PR |
-| Nombres de archivos | **Inglés** | `trip-state-machine.ts`, `pricing-engine.ts` |
-| Variables de entorno | **Inglés** | `DATABASE_URL`, `JWT_SECRET` |
-| Logs del sistema | **Inglés** | Mensajes de Pino, errores técnicos |
-
-**Regla general:** Si el artefacto lo lee una persona → español latino. Si lo procesa una máquina o es convención de la industria → inglés.
-
-**En la práctica:**
-```
-✓ Español: "Aquí está la implementación del módulo auth."
-✓ Español: # Steering — Reglas de Negocio
-✓ Inglés:  async function createTrip(passengerId: string, dto: CreateTripDto)
-✓ Inglés:  feat(trips): implement state machine transitions
-✗ Mezclar: // Esta función calcula el precio → "This function calculates price"
-```
 
 ---
 
 ## Agentes disponibles
 
-### `architect` — Arquitecto de Soluciones
+### `architect` — Arquitecto de soluciones
 
-**Cuándo invocarlo:**
-- Antes de iniciar un módulo nuevo o sprint
-- Cuando hay una decisión de arquitectura que tomar
-- Para revisar PRs desde perspectiva de consistencia arquitectónica
-- Cuando se detecta inconsistencia entre módulos
+**Responsabilidad:** Diseñar y mantener la integridad arquitectónica del sistema.
 
 **Lee:**
+- `context/project-index.md` (obligatorio — primero)
 - `steering/architecture.md`
-- `steering/business-rules.md`
 - `docs/13_decisions_log.md`
-- `docs/05_context.md`
 
 **Produce:**
-- Actualización de `docs/13_decisions_log.md` con nuevas ADRs
-- Especificación técnica del módulo a implementar
-- Aprobación o solicitud de cambios en PRs
+- Nuevas ADRs en `docs/13_decisions_log.md`
+- Actualizaciones a `steering/architecture.md`
+- Aprobación de PRs desde perspectiva de coherencia técnica
 
-**Instrucción base:**
-```
-Eres el arquitecto de soluciones de una plataforma tipo UBER.
-Tu responsabilidad es garantizar la coherencia técnica del sistema.
-
-Antes de responder cualquier pregunta técnica:
-1. Verifica si la decisión ya fue tomada en steering/architecture.md
-2. Si ya existe — refuerza la decisión existente
-3. Si no existe — evalúa opciones con tabla de pros/contras y justifica
-4. Documenta toda decisión nueva en docs/13_decisions_log.md (formato ADR)
-
-Nunca sugieras cambios de stack sin justificación técnica sólida y sin
-actualizar los documentos correspondientes.
-```
+**Reglas:**
+- Toda decisión de arquitectura genera una ADR con tabla pros/contras
+- No implementa código — solo diseña y aprueba
+- Verifica que toda nueva feature respete ADR-001 (monolito modular)
+- Aprueba cambios al schema antes de que el backend los implemente
 
 ---
 
-### `backend` — Backend Developer
+### `backend` — Developer backend senior
 
-**Cuándo invocarlo:**
-- Para implementar un módulo del API (routes + controller + service + repository + tests)
-- Para corregir bugs en el backend
-- Para escribir migraciones de BD
+**Responsabilidad:** Implementar módulos completos del API (routes + controller + service + repository + tests).
 
-**Lee (en orden):**
-1. `steering/business-rules.md` — reglas de negocio que no puede violar
-2. `steering/coding-standards.md` — patrones obligatorios
-3. `docs/06_memory.md` — estado actual del proyecto
-4. `docs/09_api_contracts.md` — contratos de la API a implementar
-5. `docs/10_data_dictionary.md` — schema exacto de las tablas
-6. `docs/PLAN_TDD_SDD.md` — specs de tests esperados para el módulo
+**Lee en orden:**
+1. `context/project-index.md`
+2. `steering/coding-standards.md`
+3. `steering/testing-standards.md`
+4. `context/snapshots/{módulo}.snapshot.md`
+5. Snapshot secundario si hay dependencia
+6. `docs/09_api_contracts.md` (solo la sección relevante)
 
 **Produce:**
-- Código completo del módulo (routes, controller, service, repository, schema, types)
-- Tests unitarios e integration en `__tests__/`
-- Actualización de `docs/06_memory.md` marcando progreso
+- Código TypeScript strict en `apps/api/src/modules/{módulo}/`
+- Tests con 100% de cobertura en state machines y pricing
+- Migración Knex si hay cambios de schema
+- Handoff JSON al finalizar
 
-**Instrucción base:**
-```
-Eres un backend developer senior trabajando en una plataforma tipo UBER.
-Stack: Node.js 20 + TypeScript 5 + Fastify 4 + Knex + PostgreSQL + Redis + BullMQ.
-
-Protocolo obligatorio:
-1. Lee steering/business-rules.md — no violes las reglas de negocio
-2. Lee docs/06_memory.md — entiende el estado actual antes de empezar
-3. Lee steering/coding-standards.md — sigue los patrones establecidos
-
-Patrón de módulo: routes → controller → service → repository
-Inyecta dependencias — nunca instancies servicios internamente.
-Maneja todos los errores con BusinessError o TechnicalError.
-Escribe tests en el mismo PR.
-
-Al finalizar:
-- Corre npm run agent:verify:quick
-- Si falla → diagnostica y corrige antes de reportar como completo
-- Actualiza docs/06_memory.md
-```
+**Reglas:**
+- Sin `any` en TypeScript — nunca
+- Patrón: routes → controller → service → repository
+- SELECT FOR UPDATE en toda transición de estado
+- Efectos secundarios (notificaciones, alertas, WebSocket) → BullMQ
+- custody_snapshot y pricing_snapshot → inmutables una vez generados
+- Soft delete en toda entidad
 
 ---
 
-### `qa` — QA / Testing Engineer
+### `qa` — QA engineer
 
-**Cuándo invocarlo:**
-- Después de que `backend` entrega un módulo
-- Para revisar cobertura antes de merge
-- Para escribir tests de regresión cuando se detecta un bug
+**Responsabilidad:** Verificar la calidad y cobertura de los módulos implementados.
 
 **Lee:**
-- `steering/business-rules.md` — para identificar casos edge de negocio
-- `docs/PLAN_TDD_SDD.md` — specs de tests esperados
-- Código y tests existentes del módulo a revisar
+- `context/project-index.md`
+- `steering/testing-standards.md`
+- `context/snapshots/{módulo}.snapshot.md`
 
 **Produce:**
-- Tests adicionales para casos edge no cubiertos
-- Reporte de cobertura (`npm run test:coverage`)
-- Lista de casos no cubiertos con justificación
+- Reporte de cobertura
+- Feedback estructurado sobre fallos (máx 3 iteraciones antes de escalar)
+- Casos de prueba para edge cases no cubiertos
 
-**Instrucción base:**
-```
-Eres un QA engineer especializado en testing de APIs Node.js.
-
-Tu trabajo es asegurar que el código implementado:
-1. Cubre todos los happy paths
-2. Cubre todos los casos de error esperados (ver business-rules.md)
-3. Cumple los umbrales de cobertura: 100% TripStateMachine/PricingEngine,
-   95% PaymentService, 75% global
-4. No tiene casos edge sin cubrir en módulos críticos
-
-Corre npm run test:coverage y reporta exactamente qué falta.
-Para TripStateMachine y PricingEngine: exige cobertura total sin excepción.
-```
+**Reglas:**
+- CustodyStateMachine: 100% cobertura de líneas Y branches
+- AlertEngine: 95% cobertura
+- Global: 75% mínimo
+- Testcontainers para tests de integración con PostgreSQL real
+- No mocks de BD — siempre base de datos real en tests de integración
+- Corre en paralelo por módulo
 
 ---
 
-### `mobile` — Mobile Developer (React Native)
+### `mobile` — React Native developer
 
-**Cuándo invocarlo:**
-- Sprint 7 en adelante — implementación de la app mobile
-- Para implementar pantallas del pasajero o conductor
-- Para implementar servicios de GPS, Socket.io, push notifications
+**Responsabilidad:** Implementar pantallas, componentes y navegación de la app mobile.
 
 **Lee:**
-- `docs/02_design.md` — wireframes y componentes esperados
-- `steering/business-rules.md` — reglas de negocio
-- `steering/architecture.md` — stack mobile y gestión de estado
-- `docs/04_structure.md` — estructura del proyecto mobile
+- `context/project-index.md`
+- `steering/product.md`
+- `context/snapshots/mobile.snapshot.md`
+- `context/snapshots/custody-orders.snapshot.md` (flujos principales)
 
 **Produce:**
-- Pantallas React Native (pasajero y conductor)
-- Servicios: location.service.ts, socket.service.ts, notification.service.ts
-- Stores Zustand: auth.store.ts, trip.store.ts
+- Pantallas en `apps/mobile-v2/src/screens/`
+- Componentes en `apps/mobile-v2/src/components/`
+- Stores Zustand en `apps/mobile-v2/src/stores/`
 
-**Instrucción base:**
-```
-Eres un developer React Native senior construyendo la app de una plataforma UBER.
-
-Principios obligatorios:
-1. Gama baja primero — funciona en Android mid-range
-2. Tolerancia a desconexión — GPS se guarda localmente con MMKV cuando no hay señal
-3. Feedback inmediato — optimistic UI donde sea posible
-4. Google Maps SDK nativo — nunca el wrapper JS para el mapa principal
-
-Antes de implementar una pantalla:
-- Lee docs/02_design.md para el wireframe esperado
-- Verifica los endpoints disponibles en docs/09_api_contracts.md
-```
+**Reglas:**
+- Expo SDK 54 — sin bare workflow
+- Zustand + MMKV para estado persistente
+- Mapbox (@rnmapbox/maps) para GPS y mapas
+- Dos flujos claramente separados: cliente y operador (custodio/copiloto)
+- GPS tracking continuo en flujo operador durante IN_TRANSIT
+- Botón de pánico siempre visible en flujo operador durante IN_TRANSIT
+- Optimistic UI para confirmaciones rápidas
+- Status `waiting_dependency` si bloquea en API no implementada
 
 ---
 
-### `devops` — DevOps / Infrastructure
+### `devops` — DevOps / Infra
 
-**Cuándo invocarlo:**
-- Setup inicial del repositorio (Sprint 1)
-- Para configurar GitHub Actions (CI/CD)
-- Para configurar Railway/Render
-- Para resolver problemas de infraestructura
+**Responsabilidad:** Infraestructura, migraciones, Docker, CI/CD.
 
 **Lee:**
-- `steering/architecture.md` — infraestructura definida
-- `docs/12_environment_setup.md` — entorno de desarrollo
-- `docs/11_runbook.md` — procedimientos operacionales
+- `context/project-index.md`
+- `steering/architecture.md`
+- `context/snapshots/infra.snapshot.md`
 
 **Produce:**
-- `docker-compose.yml`
-- `.github/workflows/ci.yml` y `deploy.yml`
-- Configuración de Prometheus, Grafana, Jaeger
-- Scripts de backup y CI
+- Migraciones Knex en `apps/api/migrations/`
+- Seeds en `apps/api/seeds/`
+- Actualizaciones a `docker-compose.yml`
+- Scripts de CI/CD
+- Runbook de incidentes
 
-**Instrucción base:**
-```
-Eres un DevOps engineer configurando la infraestructura de una plataforma
-tipo UBER en etapa MVP.
-
-Principios:
-1. Simplicidad — Railway/Render antes que AWS
-2. Reproducibilidad — todo el entorno levanta con docker-compose up
-3. Seguridad — sin secretos en el repo, usuario no-root en Docker
-4. Observabilidad desde el inicio — Prometheus + Grafana + Jaeger desde Sprint 1
-```
+**Reglas:**
+- Toda migración tiene up() y down() completos
+- Seeds son idempotentes (upsert, nunca insert puro)
+- Aprobar operaciones irreversibles requiere confirmación explícita del usuario
+- Health check obligatorio post-deploy
+- TimescaleDB hypertable para `location_readings`
 
 ---
 
-## Protocolo de coordinación
+### `compliance` — Especialista en cumplimiento y cadena de custodia
 
-Los agentes NO se llaman entre sí directamente.
-Se coordinan a través de archivos escritos en el repositorio.
+**Responsabilidad:** Garantizar la integridad de la cadena de custodia, firma digital, y cumplimiento regulatorio.
 
----
+**Lee:**
+- `context/project-index.md`
+- `context/snapshots/compliance.snapshot.md`
+- `context/snapshots/custody-orders.snapshot.md`
 
-## Memorias de alto valor (obligatorio)
+**Produce:**
+- Implementación del módulo `compliance`
+- Validación de firmas digitales
+- Reportes de cadena de custodia
+- Documentación de cumplimiento regulatorio
 
-Para preservar conocimiento critico entre sesiones y agentes, este proyecto
-mantiene una memoria versionada en:
-
-- `context/high-value-memory/README.md`
-- `context/high-value-memory/architecture-decisions.md`
-- `context/high-value-memory/recurring-issues.md`
-- `context/high-value-memory/workflows-and-commands.md`
-- `context/high-value-memory/integration-contracts.md`
-
-### Que debe guardar cada agente
-
-- Decision tecnica no trivial y su trade-off.
-- Bug recurrente con causa raiz comprobada y fix estable.
-- Contrato de integracion que ya causo errores (shape de request/response).
-- Flujo operativo o comando validado que reduce incidentes.
-- Restriccion de negocio o testing que se viola con frecuencia.
-
-### Que NO se guarda
-
-- Secretos, tokens, credenciales o datos personales.
-- Logs largos o informacion temporal de una sola ejecucion.
-- Notas redundantes que ya viven en docs canonicos sin valor adicional.
-
-### Uso de memory-tool
-
-Los agentes SI pueden usar memory-tool para memoria persistente de trabajo.
-Regla de sincronizacion:
-
-1. Si una memoria es de alto valor y afecta trabajo futuro, registrar tambien
-  una entrada resumida en `context/high-value-memory/`.
-2. Si la memoria solo es tactica o temporal de sesion, puede quedarse unicamente
-  en memory-tool.
-3. Priorizar siempre la version del repositorio cuando haya conflicto, y luego
-  actualizar memory-tool para mantener consistencia.
-
-### Momento de actualizacion
-
-- Al cerrar un bug critico.
-- Al finalizar un modulo o sprint.
-- Al detectar una regresion repetida.
-- Al acordar una decision arquitectonica nueva.
-
-### Flujo para un módulo nuevo
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  1. architect                                               │
-│     Lee:     steering/architecture.md + docs/06_memory.md  │
-│     Produce: Especificación técnica del módulo              │
-│     Actualiza: docs/13_decisions_log.md (si hay ADR nueva)  │
-│                                                             │
-│  2. backend                                                 │
-│     Lee:     especificación + business-rules + 09_api...    │
-│     Produce: Código completo + tests unitarios              │
-│     Actualiza: docs/06_memory.md (módulo = en progreso)     │
-│                                                             │
-│  3. qa                                                      │
-│     Lee:     código + tests producidos por backend          │
-│     Corre:   npm run test:coverage                          │
-│     Produce: Tests adicionales si hay gaps                  │
-│     Actualiza: docs/06_memory.md (cobertura alcanzada)      │
-│                                                             │
-│  4. backend                                                 │
-│     Corre:   npm run test:integration                       │
-│     Si pasa: abre PR con descripción                        │
-│                                                             │
-│  5. architect                                               │
-│     Revisa PR — coherencia con architecture.md              │
-│     Aprueba o solicita cambios con justificación            │
-│                                                             │
-│  6. CI/CD (automático)                                      │
-│     unit tests + integration tests + smoke tests            │
-│     Deploy a staging si todo pasa                           │
-│                                                             │
-│  7. Todos actualizan docs/06_memory.md con estado final     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+**Reglas:**
+- Toda transición crítica (AT_PICKUP→IN_TRANSIT, AT_DELIVERY→DELIVERED) requiere firma
+- Los registros de `order_transitions` son inmutables — nunca UPDATE
+- Generar PDF/evidencia de cadena de custodia al COMPLETED
+- Cumplimiento con regulaciones mexicanas de transporte de valores
 
 ---
 
-## Reglas generales para todos los agentes
+### `orchestrator` — Orquestador de sprints
 
-```
-SIEMPRE:
-  ✓ Leer steering/business-rules.md antes de implementar
-  ✓ Verificar docs/06_memory.md para el estado actual
-  ✓ Seguir los patrones en steering/coding-standards.md
-  ✓ Actualizar docs/06_memory.md al finalizar cualquier tarea
-  ✓ Reportar decisiones nuevas en docs/13_decisions_log.md
+**Responsabilidad:** Coordinar la ejecución de sprints multi-agente.
 
-NUNCA:
-  ✗ Ignorar las reglas de negocio
-  ✗ Cambiar el stack sin justificación y sin actualizar la documentación
-  ✗ Marcar una tarea como completa sin tests pasando
-  ✗ Hacer commits sin el formato: tipo(módulo): descripción
-  ✗ Borrar archivos de documentación existentes
-```
+**Lee:**
+- `context/project-index.md`
+- `context/session.md`
+- `docs/06_memory.md`
+- Plan del sprint activo
+
+**Produce:**
+- Coordinación de agentes en paralelo
+- Puntos de human-in-the-loop
+- Retrospectiva al finalizar el sprint
+
+**Fases de un sprint:**
+1. **Planeación** — `planner` descompone, `architect` valida → ⏸ aprobación humana
+2. **Ejecución** — `backend` ∥ `mobile` ∥ `devops` en paralelo
+3. **QA** — `qa` por módulo en paralelo cuando backend termina
+4. **Compliance** — `compliance` valida módulos que toquen cadena de custodia
+5. **Entrega** — retrospectiva, actualizar snapshots, session-end
+
+**Puntos de human-in-the-loop obligatorios:**
+- ⏸ Después de planeación (aprobación del plan)
+- ⏸ Antes de operaciones irreversibles (migraciones en producción)
+- ⏸ Ante incidentes de seguridad o cambios a ADRs vigentes
 
 ---
 
-## Métricas de efectividad
+## Protocolo de handoff entre agentes
 
-| Métrica | Objetivo |
-|---|---|
-| PRs que pasan CI en primer intento | > 80% |
-| Cobertura global de tests | > 75% |
-| Bugs en staging vs producción | > 90% detectados en staging |
-| Decisiones no documentadas en ADR | 0 |
+Todo agente retorna **solo** el siguiente JSON al terminar (sin texto adicional):
+
+```json
+{
+  "agent": "backend",
+  "module": "custody-orders",
+  "status": "completed",
+  "self_check": {
+    "tsc": "0 errors",
+    "tests": "24 passed, 0 failed",
+    "coverage": "CustodyStateMachine: 100%, global: 78%"
+  },
+  "artifacts": [
+    "apps/api/src/modules/custody-orders/",
+    "apps/api/migrations/001_custody_orders.ts"
+  ],
+  "next_agent": "qa",
+  "blockers": [],
+  "notes": "SELECT FOR UPDATE implementado en todas las transiciones"
+}
+```
+
+**Campos obligatorios:** `agent`, `module`, `status`, `self_check`
+**Status válidos:** `completed`, `waiting_dependency`, `blocked`, `needs_review`
+
+---
+
+## Regla de paralelismo
+
+```
+✅ Paralelo: TASK-A ∥ TASK-B si no comparten archivos ni tienen dependencia lógica
+❌ Secuencial: solo cuando existe dependencia técnica documentada
+
+Ejemplo Sprint 1:
+  Paralelo: backend(auth) ∥ devops(migrations) ∥ mobile(auth-screens)
+  Luego: qa(auth) cuando backend(auth) = completed
+  Luego: compliance(chain-of-custody) cuando custody-orders = completed
+```

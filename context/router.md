@@ -1,247 +1,91 @@
-# Context Router — UBER_BASE
+# Context Router — SistemaCustodias
 
-> Este archivo define exactamente qué cargar según el tipo de tarea.
+> Define exactamente qué cargar según el tipo de tarea.
 > Objetivo: máximo 2 snapshots + 1 archivo de steering por sesión.
 > NUNCA cargar todos los docs al mismo tiempo.
 
 ---
 
-## Cómo usar este router
+## Regla de carga
 
-1. Identifica el tipo de tarea en la tabla de abajo
-2. Carga SOLO los archivos listados en "Cargar"
-3. Ignora todo lo que esté en "Omitir"
-4. Si necesitas más contexto, carga el doc completo referenciado
+```
+Siempre:
+  context/project-index.md    (identidad del proyecto)
+  context/session.md          (estado actual)
 
-**Siempre en contexto (automático vía CLAUDE.md):**
+Luego, según el tipo de tarea detectado, cargar:
+  1 snapshot del módulo principal
+  1 snapshot secundario si hay dependencia directa
+  1 archivo de steering
 ```
-context/project-index.md    ← Referencia técnica completa (schema, módulos, ADRs, patrones)
-context/session.md          ← Estado de la sesión actual
-```
-> Nota: `steering/business-rules.md` NO se carga automáticamente — cargar solo cuando el tipo de tarea lo requiera (ver tabla abajo).
 
 ---
 
-## Tabla de routing
+## Tabla de routing por tipo de tarea
 
-### [PLANNING] — Planificación de sprint o tarea
+| Tipo | Cuándo usarlo | Snapshot principal | Snapshot secundario | Steering |
+|---|---|---|---|---|
+| `[AUTH]` | Login, OTP, JWT, roles, sesiones | `snapshots/auth.snapshot.md` | — | `steering/coding-standards.md` |
+| `[CLIENTS]` | Alta de clientes, empresas, crédito | `snapshots/clients.snapshot.md` | `snapshots/auth.snapshot.md` | `steering/coding-standards.md` |
+| `[OPERADORES]` | Custodios, copilotos, vehículos, disponibilidad | `snapshots/operadores.snapshot.md` | `snapshots/auth.snapshot.md` | `steering/coding-standards.md` |
+| `[ORDERS]` | State machine de órdenes, aprobación, asignación | `snapshots/custody-orders.snapshot.md` | `snapshots/operadores.snapshot.md` | `steering/testing-standards.md` |
+| `[VALUE_DECL]` | Declaración de valores, tipos de custodia | `snapshots/value-declaration.snapshot.md` | `snapshots/custody-orders.snapshot.md` | `steering/coding-standards.md` |
+| `[ROUTING]` | Rutas seguras, geocerca, restricciones de ruta | `snapshots/routing.snapshot.md` | `snapshots/tracking.snapshot.md` | `steering/architecture.md` |
+| `[TRACKING]` | GPS tiempo real, WebSocket, TimescaleDB | `snapshots/tracking.snapshot.md` | `snapshots/alerts.snapshot.md` | `steering/architecture.md` |
+| `[ALERTS]` | Botón de pánico, tamper, geofence, incidentes | `snapshots/alerts.snapshot.md` | `snapshots/tracking.snapshot.md` | `steering/testing-standards.md` |
+| `[NOTIFICATIONS]` | FCM push, SMS, circuit breaker | `snapshots/notifications.snapshot.md` | — | `steering/coding-standards.md` |
+| `[PAYMENTS]` | Stripe, facturación, reembolsos | `snapshots/payments.snapshot.md` | `snapshots/custody-orders.snapshot.md` | `steering/coding-standards.md` |
+| `[SCHEDULER]` | Órdenes programadas, ventanas de despacho | `snapshots/scheduler.snapshot.md` | `snapshots/custody-orders.snapshot.md` | `steering/coding-standards.md` |
+| `[COMPLIANCE]` | Cadena de custodia, firmas, regulatorio | `snapshots/compliance.snapshot.md` | `snapshots/custody-orders.snapshot.md` | `steering/coding-standards.md` |
+| `[ADMIN]` | Dashboard despachador/supervisor, config | `snapshots/admin.snapshot.md` | — | `steering/product.md` |
+| `[MOBILE]` | App (flujo cliente + flujo operador) | `snapshots/mobile.snapshot.md` | `snapshots/custody-orders.snapshot.md` | `steering/product.md` |
+| `[INFRA]` | Docker, migraciones, seeds, CI/CD | `snapshots/infra.snapshot.md` | — | `steering/architecture.md` |
+| `[ARCHITECTURE]` | Decisiones técnicas, ADRs, diseño de sistema | — | — | `steering/architecture.md` + `docs/13_decisions_log.md` |
+| `[TESTING]` | Estrategia de tests, cobertura, fixtures | — | — | `steering/testing-standards.md` + `docs/PLAN_TDD_SDD.md` |
+| `[PLANNING]` | Planeación de sprints, nuevas features | — | — | `docs/06_memory.md` + `docs/PLAN_TDD_SDD.md` |
+| `[REVIEW]` | Code review, PR review | — | snapshot del módulo revisado | `steering/coding-standards.md` |
+
+---
+
+## Heurísticas para detectar el tipo de tarea
+
 ```
-Trigger: "qué sigue", "próximo sprint", "planear", "priorizar"
+Menciona "login", "token", "OTP", "autenticación", "sesión"     → [AUTH]
+Menciona "cliente", "empresa", "RFC", "crédito"                  → [CLIENTS]
+Menciona "custodio", "copiloto", "operador", "vehículo"          → [OPERADORES]
+Menciona "orden", "custodia", "aprobación", "asignación"         → [ORDERS]
+Menciona "declaración", "valor declarado", "tipo de custodia"    → [VALUE_DECL]
+Menciona "ruta", "geocerca", "distancia", "restricción"          → [ROUTING]
+Menciona "GPS", "ubicación", "tracking", "tiempo real"           → [TRACKING]
+Menciona "alerta", "pánico", "incidente", "tamper"               → [ALERTS]
+Menciona "push", "notificación", "SMS", "FCM"                    → [NOTIFICATIONS]
+Menciona "pago", "Stripe", "factura", "cobro"                    → [PAYMENTS]
+Menciona "programado", "scheduler", "ventana de tiempo"          → [SCHEDULER]
+Menciona "cadena de custodia", "firma", "cumplimiento"           → [COMPLIANCE]
+Menciona "dashboard", "despachador", "supervisor", "admin"       → [ADMIN]
+Menciona "app mobile", "pantalla", "flujo cliente/operador"      → [MOBILE]
+Menciona "Docker", "migración", "seed", "CI/CD", "Railway"       → [INFRA]
+Menciona "ADR", "arquitectura", "decisión técnica"               → [ARCHITECTURE]
+Menciona "test", "cobertura", "fixture", "factory"               → [TESTING]
+Menciona "sprint", "planear", "nueva feature", "roadmap"         → [PLANNING]
+```
+
+---
+
+## Ejemplo de carga para [ORDERS]
+
+```
+Sesión: trabajo en la state machine de la orden de custodia
 
 Cargar:
-  context/session.md
-  docs/06_memory.md           ← Estado actual de módulos
-  steering/product.md         ← Fases y verticales
-  docs/PLAN_TDD_SDD.md        ← Orden de implementación
+  ✅ context/project-index.md           (siempre)
+  ✅ context/session.md                  (siempre)
+  ✅ context/snapshots/custody-orders.snapshot.md   (principal)
+  ✅ context/snapshots/operadores.snapshot.md       (secundario — asignación de equipo)
+  ✅ steering/testing-standards.md                  (testing crítico en state machine)
 
-Omitir: todos los snapshots individuales, docs técnicos
+No cargar:
+  ❌ docs/00_arquitectura_base_v1.md   (demasiado grande)
+  ❌ otros snapshots no relacionados
+  ❌ múltiples archivos de steering
 ```
-
----
-
-### [AUTH] — Módulo de autenticación
-```
-Trigger: auth, OTP, JWT, login, registro, refresh token, teléfono
-
-Cargar:
-  context/session.md
-  context/snapshots/auth.snapshot.md
-  steering/business-rules.md    (solo sección Auth)
-  steering/coding-standards.md
-
-Doc completo si necesitas:
-  docs/09_api_contracts.md      (endpoints de /auth/*)
-  docs/10_data_dictionary.md    (tablas: users, user_auth, user_roles)
-```
-
----
-
-### [DRIVERS] — Módulo de conductores
-```
-Trigger: conductor, driver, documentos, onboarding, disponibilidad, go-online
-
-Cargar:
-  context/session.md
-  context/snapshots/drivers.snapshot.md
-  steering/business-rules.md    (secciones R-DRV-*)
-
-Doc completo si necesitas:
-  docs/10_data_dictionary.md    (tablas: drivers, driver_documents, vehicles)
-  docs/09_api_contracts.md      (endpoints de /drivers/*)
-```
-
----
-
-### [TRIPS] — Ciclo de vida del viaje (módulo crítico)
-```
-Trigger: viaje, trip, estado, state machine, aceptar, completar, cancelar,
-         SEARCHING, ACCEPTED, IN_PROGRESS, COMPLETED
-
-Cargar:
-  context/session.md
-  context/snapshots/trips.snapshot.md
-  steering/business-rules.md    (secciones R-TRIP-*)
-  steering/testing-standards.md (umbrales 100%)
-
-Doc completo si necesitas:
-  docs/10_data_dictionary.md    (tablas: trips, trip_status_history)
-  docs/PLAN_TDD_SDD.md          (specs TripStateMachine)
-```
-
----
-
-### [PRICING] — Motor de precios
-```
-Trigger: precio, tarifa, factor, multiplier, IVA, pricing, fare, cotización
-
-Cargar:
-  context/session.md
-  context/snapshots/pricing.snapshot.md
-  steering/business-rules.md    (secciones R-PRICE-*)
-
-Doc completo si necesitas:
-  docs/10_data_dictionary.md    (tablas: trip_types, pricing_factors)
-  docs/PLAN_TDD_SDD.md          (specs PricingEngine)
-```
-
----
-
-### [PAYMENTS] — Pagos con Stripe
-```
-Trigger: pago, Stripe, cobro, refund, reembolso, BullMQ payment, worker
-
-Cargar:
-  context/session.md
-  context/snapshots/payments.snapshot.md
-  steering/business-rules.md    (secciones R-PAY-*)
-
-Doc completo si necesitas:
-  docs/10_data_dictionary.md    (tablas: payments, passenger_payment_methods)
-  docs/PLAN_TDD_SDD.md          (specs PaymentService)
-```
-
----
-
-### [TRACKING] — GPS y tiempo real
-```
-Trigger: GPS, ubicación, location, tracking, WebSocket, Socket.io, tiempo real,
-         TimescaleDB, driver location
-
-Cargar:
-  context/session.md
-  context/snapshots/tracking.snapshot.md
-  steering/architecture.md      (sección Redis keys, TimescaleDB)
-
-Doc completo si necesitas:
-  docs/10_data_dictionary.md    (tabla: trip_locations)
-  docs/03_tech.md               (configuración TimescaleDB)
-```
-
----
-
-### [NOTIFICATIONS] — Push, SMS, email
-```
-Trigger: notificación, FCM, push, SMS, Twilio, alerta, fallback
-
-Cargar:
-  context/session.md
-  context/snapshots/notifications.snapshot.md
-  steering/architecture.md      (sección Circuit breakers, fallbacks)
-```
-
----
-
-### [ADMIN] — Panel administrativo
-```
-Trigger: admin, dashboard, panel, operaciones, configuración, comisiones
-
-Cargar:
-  context/session.md
-  context/snapshots/admin.snapshot.md
-  steering/product.md           (actores: Administrador)
-```
-
----
-
-### [INFRA] — Infraestructura y DevOps
-```
-Trigger: docker, CI/CD, deploy, Railway, Render, migraciones, seeds,
-         GitHub Actions, variables de entorno
-
-Cargar:
-  context/session.md
-  context/snapshots/infra.snapshot.md
-  steering/architecture.md
-
-Doc completo si necesitas:
-  docs/VERTICAL_CLONE_GUIDE.md  ← setup completo actualizado (usar este)
-  docs/11_runbook.md
-  ⚠️ docs/12_environment_setup.md está desactualizado — no usar
-```
-
----
-
-### [MOBILE] — App React Native
-```
-Trigger: mobile, React Native, pantalla, screen, pasajero app, conductor app,
-         MMKV, Zustand, offline, Mapbox, vertical UX, cargo, custodia, temperatura
-
-Cargar:
-  context/session.md
-  context/snapshots/mobile.snapshot.md
-  steering/product.md           (actores + pantallas)
-  steering/architecture.md      (sección Mobile)
-```
-
----
-
-### [ARCHITECTURE] — Decisiones técnicas
-```
-Trigger: ADR, arquitectura, stack, cambio técnico, nueva tecnología
-
-Cargar:
-  context/session.md
-  steering/architecture.md      (completo)
-  docs/13_decisions_log.md      (completo)
-```
-
----
-
-### [TESTING] — Tests y cobertura
-```
-Trigger: test, coverage, cobertura, Jest, Playwright, spec, TDD
-
-Cargar:
-  context/session.md
-  steering/testing-standards.md (completo)
-  docs/PLAN_TDD_SDD.md          (specs del módulo relevante)
-  context/snapshots/{module}.snapshot.md
-```
-
----
-
-### [REVIEW] — Revisión de código
-```
-Trigger: revisar, review, PR, pull request, refactor, calidad
-
-Cargar:
-  context/session.md
-  steering/coding-standards.md  (completo)
-  steering/business-rules.md    (sección relevante)
-  context/snapshots/{module}.snapshot.md
-```
-
----
-
-## Presupuesto de contexto por sesión
-
-| Tipo de archivo | Tamaño aprox | ¿Cargar? |
-|---|---|---|
-| CLAUDE.md | ~2KB | Siempre (automático) |
-| context/session.md | ~1KB | Siempre |
-| steering/business-rules.md | ~5KB | Siempre |
-| Un snapshot de módulo | ~1KB | Solo si aplica (máx 2) |
-| Un archivo de steering | ~3KB | Solo si aplica (máx 1) |
-| Doc completo (docs/*.md) | 5-15KB | Solo si se necesita profundidad |
-| **Total objetivo** | **< 15KB** | |
-| **Límite máximo** | **< 30KB** | Si supera esto, reducir |

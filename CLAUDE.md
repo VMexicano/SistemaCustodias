@@ -1,6 +1,6 @@
-# CLAUDE.md — UBER_BASE
+# CLAUDE.md — SistemaCustodias
 
-Plataforma tipo UBER · MVP Taxi México · Node.js 20 + TypeScript 5 + Fastify 4 + PostgreSQL + Redis + React Native
+Plataforma de custodia de valores · Node.js 20 + TypeScript 5 + Fastify 4 + PostgreSQL 15 + Redis 7 + React Native (Expo)
 
 ---
 
@@ -39,13 +39,46 @@ Regla: cargar máximo **2 snapshots + 1 archivo de steering** por sesión.
 | Tipo | Snapshot | Steering |
 |---|---|---|
 | [AUTH] | context/snapshots/auth.snapshot.md | coding-standards.md |
-| [TRIPS] | context/snapshots/trips.snapshot.md | testing-standards.md |
-| [PRICING] | context/snapshots/pricing.snapshot.md | testing-standards.md |
-| [PAYMENTS] | context/snapshots/payments.snapshot.md | coding-standards.md |
-| [DRIVERS] | context/snapshots/drivers.snapshot.md | coding-standards.md |
+| [CLIENTS] | context/snapshots/clients.snapshot.md | coding-standards.md |
+| [OPERADORES] | context/snapshots/operadores.snapshot.md | coding-standards.md |
+| [ORDERS] | context/snapshots/custody-orders.snapshot.md | testing-standards.md |
+| [VALUE_DECL] | context/snapshots/value-declaration.snapshot.md | coding-standards.md |
 | [TRACKING] | context/snapshots/tracking.snapshot.md | architecture.md |
+| [ALERTS] | context/snapshots/alerts.snapshot.md | testing-standards.md |
+| [PAYMENTS] | context/snapshots/payments.snapshot.md | coding-standards.md |
+| [COMPLIANCE] | context/snapshots/compliance.snapshot.md | coding-standards.md |
+| [NOTIFICATIONS] | context/snapshots/notifications.snapshot.md | coding-standards.md |
+| [SCHEDULER] | context/snapshots/scheduler.snapshot.md | coding-standards.md |
+| [ADMIN] | context/snapshots/admin.snapshot.md | steering/product.md |
 | [INFRA] | context/snapshots/infra.snapshot.md | architecture.md |
+| [MOBILE] | context/snapshots/mobile.snapshot.md | steering/product.md |
 | [PLANNING] | — | docs/06_memory.md + docs/PLAN_TDD_SDD.md |
+
+---
+
+## Actores del sistema
+
+| Actor | Rol | Plataforma |
+|---|---|---|
+| `client` | Solicita y hace seguimiento de la custodia | Mobile (flujo cliente) + Web |
+| `custodio` | Ejecuta el transporte de valores — conductor de la unidad | Mobile (flujo operador) |
+| `copiloto` | Acompañante de seguridad en la unidad | Mobile (flujo operador) |
+| `dispatcher` | Crea, asigna y coordina órdenes | Web |
+| `supervisor` | Aprueba órdenes y gestiona incidentes | Web |
+
+---
+
+## Tipos de custodia (escalables vía JSONB `custody_config`)
+
+| Slug | Descripción |
+|---|---|
+| `cash_transport` | Efectivo, cheques, valores monetarios |
+| `high_value_package` | Joyería, electrónicos, mercancía costosa |
+| `confidential_docs` | Documentos legales, notariales, corporativos |
+| `vip_escort` | Escolta y protección de personas |
+
+Cada tipo define sus propios campos de `value_declaration` en la tabla `custody_types`.
+Agregar un nuevo tipo **no requiere cambios de código** — solo un registro en la BD.
 
 ---
 
@@ -55,23 +88,28 @@ Regla: cargar máximo **2 snapshots + 1 archivo de steering** por sesión.
 ✓ TypeScript strict — sin any
 ✓ routes → controller → service → repository
 ✓ Inyección de dependencias
-✓ SELECT FOR UPDATE en transiciones de estado de viajes
+✓ SELECT FOR UPDATE en transiciones de estado de órdenes
 ✓ Efectos secundarios FUERA de transacciones (encolar en BullMQ)
 ✓ Soft delete (deleted_at) — NUNCA DELETE
-✓ Audit log para cambios de entidades de negocio
-✓ pricing_snapshot es inmutable — nunca escribirlo dos veces
+✓ Audit log en toda transición de estado (actor, timestamp, GPS, motivo)
+✓ custody_snapshot es inmutable — nunca reescribir después de APPROVED
+✓ Toda orden requiere aprobación de supervisor (no opcional)
+✓ Regla dos-personas: toda orden asigna custodio + copiloto (mínimo)
+✓ Chain of custody: cada transición registra firma digital o confirmación biométrica
 ```
+
+---
 
 ## Cobertura de tests requerida
 
-TripStateMachine: **100%** · PricingEngine: **100%** · PaymentService: **95%** · Global: **75%**
+CustodyStateMachine: **100%** · PricingEngine: **100%** · AlertEngine: **95%** · Global: **75%**
 
 ---
 
 ## Al finalizar cualquier tarea
 
 ```
-1. pnpm --filter @ridebase/api agent:verify:quick
+1. pnpm --filter @custodias/api agent:verify:quick
 2. Actualizar context/snapshots/{module}.snapshot.md
 3. Actualizar docs/06_memory.md
 4. Commit: feat({module}): descripción
@@ -82,7 +120,7 @@ TripStateMachine: **100%** · PricingEngine: **100%** · PaymentService: **95%**
 
 ## Agentes disponibles (ver agents/)
 
-`architect` · `backend` · `qa` · `mobile` · `devops`
+`architect` · `backend` · `qa` · `mobile` · `devops` · `compliance`
 
 Cada agente tiene su system prompt completo en `agents/{nombre}.md`.
 
@@ -104,11 +142,9 @@ Grupo 2 (espera G1):  TASK-D ∥ TASK-E            → lanzar simultáneamente c
 Grupo 3 (espera G2):  TASK-F                      → lanzar cuando G2 ✅
 ```
 
-**Regla:** Si dos tareas no comparten archivos ni tienen dependencia lógica, van en paralelo. No lanzarlas secuencialmente salvo que exista una razón técnica explícita documentada.
-
 **QA también corre en paralelo** — un agente qa por módulo, simultáneamente cuando sus backends terminan.
 
-Esta regla aplica a todos los agentes: backend, qa, mobile, devops.
+---
 
 ## Output compacto de agentes — Regla de tokens
 
@@ -116,21 +152,11 @@ Esta regla aplica a todos los agentes: backend, qa, mobile, devops.
 
 Tests y verificaciones se corren en modo silencioso:
 ```bash
-# ✅ Verificación compacta — correr SOLO el módulo en foco (nunca la suite completa salvo indicación explícita)
+# ✅ Verificación compacta — correr SOLO el módulo en foco
 npx tsc --noEmit 2>&1 | head -5
 npx jest --silent --passWithNoTests --testPathPattern="{module}" 2>&1 \
   | grep -E "^(Tests|Test Suites|PASS|FAIL):" | head -5
 
-# ✅ Si falla → leer el output COMPLETO del test fallido (sin tail, sin head):
+# ✅ Si falla → leer el output COMPLETO del test fallido:
 npx jest --forceExit --testPathPattern="{module}" 2>&1
-
-# ✅ Cobertura compacta
-npx jest --silent --coverage --coverageReporters=text 2>/dev/null \
-  | grep -E "^\s*(PASS|FAIL|%|All files|{module})" | head -20
 ```
-
-**Reglas de análisis — CRÍTICAS:**
-- **Tests:** Por defecto correr solo el test del módulo en foco (`--testPathPattern={module}`). Correr la suite completa SOLO cuando el usuario lo pide explícitamente o el plan lo especifica.
-- **Fallos en tests:** Leer el output COMPLETO del test (sin `tail`, sin `head`). El error real puede estar en cualquier línea, no solo al final.
-- **Respuestas de API:** Al depurar comportamiento de un endpoint, siempre leer y analizar el body completo de la respuesta (status code + body + headers relevantes). No asumir el comportamiento por el status code solo.
-- **Monitoreo de agentes en background:** `tail -5 {output_file}` solo para verificar si el agente terminó (buscar el JSON de handoff). Para análisis de errores en output de agentes, leer el output completo.

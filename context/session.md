@@ -1,75 +1,51 @@
 # Session — Estado de la Sesión Actual
 
 > Este archivo se resetea al inicio de cada sesión con /session-start
-> y se actualiza al finalizar con /session-end
+> y se actualiza al finalizar con /session-end.
 > Es el único archivo que siempre se carga en contexto.
 
 ---
 
-## Sesión activa
+## Estado actual
 
-**Fecha:** 2026-05-07 — Sprint 17: Flujo aprobación multi-vertical
-**Estado:** ✅ COMPLETO — retrospectiva cerrada
-
----
-
-## Resumen de lo logrado
-
-- ADR-047: flujo de aprobación opcional activado por `requiresApproval` en vertical.features
-- Migration 038: `approved_at` + `approved_by` FK admin_users en trips
-- TripStateMachine: 5 transiciones nuevas + actor `dispatcher` (60 tests, 100% coverage)
-- `trips.service`: `approveTrip`, `rejectTrip`, `getPendingApproval`, `handlePromoteApproved`
-- BullMQ job `trip.promote-approved`: transición APPROVED → SEARCHING
-- Seed 11: `requiresApproval: true` en custody y cold-chain
-- Backend GET `/admin/trips/pending-approval` paginado
-- Backoffice: `AprobacionesPage` + `usePendingApprovals` + badge en Sidebar
-- Mobile: banners naranja/azul en `ActiveTripScreen` para PENDING_APPROVAL/APPROVED
-- Smoke E2E: `approval-flow.spec.ts` (5 tests)
-- Bug fix: `dispatcher actorId = null` por incompatibilidad FK `changed_by → users.id`
-- Test script `test-approval.mjs` verifica flujo completo ✅
+**Sprint:** 0 — Setup y planeación inicial
+**Fecha:** 2026-05-13
+**Tipo de tarea:** [PLANNING]
 
 ---
 
-## Próxima sesión — Retomar aquí
+## Logros de esta sesión
 
-### Ambiente a restaurar
+- [x] Repositorio SistemaCustodias creado en GitHub (fork clean de UBER_BASE)
+- [x] CLAUDE.md redefinido para dominio de custodias
+- [x] context/project-index.md reescrito con schema, actores, tipos de custodia, ADRs iniciales
+- [x] context/router.md actualizado con 19 rutas para módulos de custodia
+- [x] AGENTS.md redefinido con 6 agentes (incluyendo nuevo agente `compliance`)
+- [x] Snapshots de módulos críticos creados (custody-orders, operadores, alerts, mobile, compliance)
+- [x] `.claude/settings.json` configurado para SistemaCustodias
+- [x] `.gitignore` actualizado (app.json y settings.json excluidos)
 
-```bash
-# Tunnels emulador
-adb reverse tcp:8081 tcp:8081 && adb reverse tcp:9091 tcp:9091 && adb reverse tcp:3333 tcp:3333
+---
 
-# Verificar backend (puerto 3333)
-curl -s http://localhost:3333/config | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('slug'), d.get('name'))"
-# Esperado: custody  Custodia de Valores
-```
+## Próximos pasos
 
-### Tarea pendiente 1 — Smoke test custodia completo
+1. Definir documentos de steering (`steering/coding-standards.md`, `steering/testing-standards.md`, `steering/architecture.md`, `steering/product.md`)
+2. Planear Sprint 1: módulo `auth` + `clients` + schema inicial de BD
+3. Crear migraciones iniciales
+4. Setup Docker / infra local
 
-El flujo de aprobación ya funciona en API. Pendiente verificar en emulador:
-1. Pasajero crea viaje custody → pantalla muestra banner naranja "Esperando aprobación"
-2. Admin aprueba en backoffice (AprobacionesPage) → banner cambia a azul "Aprobado"
-3. BullMQ promueve APPROVED → SEARCHING → conductor ve solicitud
-4. Conductor acepta → flujo normal hasta completar
+---
 
-### Tarea pendiente 2 — Evaluar hardening producción
+## Ambiente al cerrar
 
-- Configurar credenciales reales: Firebase, Stripe, Google Maps
-- Deploy en staging (Railway o Render)
-- Smoke tests Playwright en staging
+- Backend: no iniciado (Sprint 0)
+- Mobile: no iniciado
+- DB: no configurada aún
 
-### Estado del ambiente al cerrar
+---
 
-| Servicio | Estado |
-|---|---|
-| Backend API | ✅ `localhost:3333` · VERTICAL_SLUG=custody |
-| Migration 038 | ✅ Aplicada |
-| Seed 11 | ✅ Aplicado |
-| Metro | Desconocido — reiniciar si necesario |
-| Emulador | `Medium_Phone_API_36.0` |
-| Redis | Activo |
-| DB | Sprint 17 aplicado |
-| Backoffice | `http://localhost:5173` |
+## Contexto cargado en esta sesión
 
-### Módulos en foco para la próxima sesión
-
-`[TRIPS]` `[MOBILE]` · Snapshots: `trips.snapshot.md`
+- context/project-index.md
+- context/session.md
+- (planning — sin snapshots adicionales)

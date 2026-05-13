@@ -1,294 +1,340 @@
-# Project Index — UBER_BASE
-> Referencia densa para LLMs. Actualizar al final de cada sprint.
-> Última actualización: 2026-05-07 — Sprint 17 completo. Flujo de aprobación multi-vertical (ADR-047): PENDING_APPROVAL + APPROVED + actor dispatcher. Migration 038: approved_at/approved_by en trips. Seed 11: requiresApproval=true en custody y cold-chain. Backoffice: AprobacionesPage + usePendingApprovals. Mobile: banners PENDING_APPROVAL/APPROVED en ActiveTripScreen.
+# project-index.md — SistemaCustodias
+> Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
+> Última actualización: 2026-05-13 — Sprint 0 iniciado. Infraestructura de IA establecida.
 
 ---
 
-## Stack (inamovible en MVP)
+## Stack (inamovible)
 
-| Capa | Tecnología | Versión |
-|---|---|---|
-| Runtime | Node.js | 20 LTS |
-| Lenguaje | TypeScript strict | 5 |
-| API | Fastify | 4 |
-| ORM | Knex | 3 |
-| BD | PostgreSQL + TimescaleDB | 15 |
-| Cache / Queues | Redis + BullMQ | 7 / 5 |
-| Real-time | Socket.io | 4 |
-| Mobile | React Native (Expo SDK 54) | 0.81.5 |
-| Web panel | Next.js | 14 |
-| Monorepo | Turborepo + pnpm | 2 / 9 |
-| Tests | Jest + Testcontainers + Supertest | 29 / 10 / 7 |
-| CI | GitHub Actions | — |
-
----
-
-## Módulos — estado actual
-
-| Módulo | Estado | Tests | Endpoints |
-|---|---|---|---|
-| Auth | ✅ Sprint 2 | 65/65 | POST /auth/register, /verify-phone, /login, /refresh |
-| Users | ✅ Sprint 2 | 65/65 | GET/PATCH /users/me, POST/GET /users/me/payment-methods |
-| Drivers | ✅ Sprint 3 | 114/114 | 11 endpoints + PATCH /admin/documents/:id |
-| Trips | ✅ Sprint 17 | 247+ tests + 60 SM | 10 endpoints REST + WebSocket + approval flow (ADR-047) |
-| Pricing | ✅ Sprint 4 | 247/247 | POST /trips/estimate |
-| Payments | ✅ Sprint 5 | 40 unit tests | GET /trips/:id/payment |
-| Tracking | ✅ Sprint 7 | — | GET /trips/:id/track, POST /users/me/device-token |
-| Notifications | ✅ Sprint 5 | 40 unit tests | — (BullMQ worker) |
-| Scheduler | ✅ Sprint 9 | 26 unit tests | POST/GET/DELETE /trips/schedule (despacho T-30, push T-15) |
-| Admin | ✅ Sprint 11 | 26 unit tests | 14 endpoints + AdminLayout + 6 páginas Backoffice v2 |
-| Verticals | ✅ Sprint 10 | 5 unit tests | GET /config (público), GET/PATCH /admin/verticals |
-| Companies | ✅ Sprint 10 | 7 unit tests | 7 endpoints CRUD /admin/companies + users |
-| Configurations | ✅ Sprint 10 | 5 unit tests | GET/PUT/DELETE /config/entity/:type/:id/:ns/:key |
-| Mobile v2 | ✅ Sprint 14 | 117 unit tests | CargoDeclaration + TemperatureLog + CustodyEvent + vertical-aware navigation |
-| Backoffice web | ✅ Sprint 15 | 4 Playwright E2E | TripsPage tabs Temp+Custodia (Recharts) + VerticalesPage modal editor + Clone Kit |
-| Custody | ✅ Sprint 13 | 13 unit tests | POST /trips/:id/custody/events, GET /trips/:id/custody (append-only) |
-| Temperature | ✅ Sprint 13 | 11 unit tests | POST /trips/:id/temperature, GET /trips/:id/temperature (hypertable) |
-
----
-
-## Schema de BD — tablas existentes (29 migraciones)
-
-```
-region_config          — id, country_code, currency, timezone, tax_pct
-users                  — id, phone, full_name, status, phone_verified, region_id
-user_roles             — user_id, role (passenger|driver|admin)
-user_auth              — user_id, refresh_token_jti, otp_code, otp_expires_at
-drivers                — id, user_id, region_id, license_number, license_expiry,
-                         status(pending|documents_submitted|approved|suspended),
-                         service_modes TEXT[] DEFAULT '{people}', online, rating_avg
-document_requirements  — id, region_id, code, name, required, active
-driver_documents       — id, driver_id, requirement_id, file_url,
-                         status(pending|approved|rejected), expires_at
-vehicles               — id, driver_id, make, model, year, color, license_plate,
-                         status(pending|approved|rejected), active
-trip_types             — id, region_id, code, name, base_fare, cost_per_km,
-                         cost_per_minute, min_fare, service_mode VARCHAR(20)
-pricing_factors        — id, region_id, code, name, type(fixed_amount|percentage|multiplier),
-                         value, stackable, priority, active
-pricing_factor_rules   — id, factor_id, condition_type, condition_value
-commission_rules       — id, region_id, platform_fee_pct, active, valid_from, valid_until
-verticals              — id, slug, name, description, features JSONB, config JSONB,
-                         active, created_at, updated_at  ← Migration 034 (Sprint 10)
-companies              — id, vertical_id FK, slug, name, rfc, tax_id, contact_email,
-                         contact_phone, address, active, metadata JSONB,
-                         created_at, updated_at, deleted_at  ← Migration 035 (Sprint 10)
-company_users          — id, company_id FK, user_id FK, role (owner|admin|member),
-                         created_at, updated_at  ← Migration 035
-configurations         — id, entity_type (company|user|vertical), entity_id, namespace,
-                         key, value JSONB, created_at, updated_at  ← Migration 035
-trips                  — id, region_id, passenger_id, driver_id, trip_type_id,
-                         status VARCHAR(30), origin_*, destination_*,
-                         estimated_distance_km, estimated_duration_min, estimated_fare,
-                         actual_distance_km, actual_duration_min, final_fare,
-                         pricing_snapshot JSONB (inmutable — ADR-009),
-                         metadata JSONB DEFAULT '{}' ← Migration 034 (Sprint 10),
-                         accepted_at, started_at, completed_at, cancelled_at,
-                         approved_at TIMESTAMP nullable, approved_by UUID nullable FK admin_users
-                         ← Migration 038 (Sprint 17)
-trip_status_history    — id, trip_id, from_status, to_status, changed_by (FK users nullable),
-                         actor_type VARCHAR(20), notes
-                         NOTA: dispatcher actorId siempre null (FK vs admin_users — ADR-047)
-trip_locations         — trip_id, driver_id, lat, lng, recorded_at (hypertable TimescaleDB)
-scheduled_trips        — trip_id, scheduled_for, reminder_24h_sent, reminder_1h_sent,
-                         dispatch_window_min (DEFAULT 30), search_started_at,
-                         passenger_notified_searching_at, pre_assigned_driver_id (FK drivers),
-                         pre_assigned_at  ← Migration 033 (Sprint 9)
-temperature_readings   — trip_id FK, recorded_at (hypertable partition key), celsius DECIMAL(5,2),
-                         sensor_id TEXT, lat, lng  ← Migration 036 (Sprint 13) — NO PK propia
-custody_events         — id UUID PK, trip_id FK, event_type CHECK(pick_up|handoff|delivery),
-                         actor_id FK users, signature_url, photo_url, declared_value,
-                         notes, lat, lng, occurred_at, sequence INTEGER
-                         UNIQUE(trip_id, sequence) — append-only  ← Migration 036 (Sprint 13)
-document_requirements  — [alterado] + vertical_id UUID nullable FK → verticals  ← Migration 036
-trip_types             — [alterado] + weight_capacity_kg DECIMAL(8,2) nullable  ← Migration 036
-payments               — id, trip_id, passenger_id, driver_id, amount, tax_amount,
-                         platform_fee, driver_earnings, currency, status, stripe_payment_intent_id,
-                         stripe_charge_id, failure_reason, retry_count, charged_at
-passenger_payment_methods — id, passenger_id, stripe_customer_id (nullable, migración 029),
-                         provider_method_id, last4, brand, is_default
-trip_applied_factors   — id, trip_id, factor_id, factor_code, factor_value, impact_amount
-ratings                — id, trip_id, rater_id, ratee_id, score, comment
-audit_logs             — id, entity_type, entity_id, action, actor_type, actor_id, old_value, new_value
-system_error_logs      — id, error_code, message, stack, context, resolved_at
-```
-
----
-
-## Seeds existentes
-
-| Archivo | Contenido |
+| Capa | Tecnología |
 |---|---|
-| 01_region_config | region MX: currency MXN, tax_pct 0.16 |
-| 02_trip_types | basic(UberX $25+8.5/km), plus($35+12/km), premium($60+18/km) |
-| 03_pricing_factors | night(+20%), rain(×1.3), peak_hour(×1.5), high_demand(×2.0) — todos inactive |
-| 04_admin_user | usuario admin con rol admin |
-| 05_document_requirements | drivers_license, vehicle_registration, vehicle_insurance, driver_photo, vehicle_photo |
-| 09_verticals_and_companies | 3 verticals (taxi, custody, cold-chain) + empresa-demo SA + link trip_types→taxi |
-| 10_vertical_document_requirements | doc requirements por vertical (custody: 2, cold-chain: 2) + features JSONB merge (pricingModel + cargo/temp/custody flags) |
-| 11_enable_approval_verticals | requiresApproval: true en custody y cold-chain via features `||` jsonb operator |
+| Runtime | Node.js 20 LTS |
+| Lenguaje | TypeScript 5 strict |
+| API | Fastify 4 |
+| BD relacional | PostgreSQL 15 (TimescaleDB para tracking) |
+| Cache / Pub-Sub | Redis 7 |
+| Queue | BullMQ |
+| ORM / Query | Knex |
+| Mobile | React Native 0.81 + Expo SDK 54 |
+| Web admin | Vite 5 + React 19 + TanStack Router |
+| Mapas | Mapbox (rnmapbox/maps) |
+| Pagos | Stripe |
+| Notificaciones | FCM + SMS fallback |
+| Monorepo | pnpm workspaces + Turborepo |
 
 ---
 
-## Reglas de negocio críticas (no violar)
+## Actores del sistema
+
+| Actor | Código interno | Plataforma |
+|---|---|---|
+| Cliente | `client` | Mobile (flujo cliente) + Web |
+| Custodio | `custodio` | Mobile (flujo operador) |
+| Copiloto | `copiloto` | Mobile (flujo operador) |
+| Despachador | `dispatcher` | Web |
+| Supervisor | `supervisor` | Web |
+
+---
+
+## Tipos de custodia (`custody_types` table — escalables)
+
+| Slug | Descripción | `value_declaration` schema clave |
+|---|---|---|
+| `cash_transport` | Efectivo, cheques, documentos bancarios | `amount_mxn, currency, denomination_breakdown` |
+| `high_value_package` | Joyería, electrónicos, mercancía costosa | `description, estimated_value_mxn, insurance_required` |
+| `confidential_docs` | Documentos legales, notariales, corporativos | `document_type, issuing_entity, sensitivity_level` |
+| `vip_escort` | Escolta y protección de personas | `person_name, threat_level, route_restrictions` |
+
+Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de código.
+
+---
+
+## Módulos del sistema
+
+| # | Módulo | Estado | Descripción |
+|---|---|---|---|
+| 01 | `auth` | ⬜ Pendiente | OTP, JWT, refresh token — todos los actores |
+| 02 | `clients` | ⬜ Pendiente | Gestión de clientes (empresa/persona) |
+| 03 | `operadores` | ⬜ Pendiente | Custodios y copilotos — onboarding, documentos, disponibilidad |
+| 04 | `custody-orders` | ⬜ Pendiente | State machine completo de la orden de custodia |
+| 05 | `value-declaration` | ⬜ Pendiente | Declaración de valores — schema dinámico por tipo |
+| 06 | `routing` | ⬜ Pendiente | Planeación y validación de rutas seguras |
+| 07 | `tracking` | ⬜ Pendiente | GPS tiempo real — TimescaleDB + WebSocket |
+| 08 | `alerts` | ⬜ Pendiente | Botón de pánico, tamper detection, incidentes |
+| 09 | `notifications` | ⬜ Pendiente | FCM push + SMS fallback + circuit breaker |
+| 10 | `payments` | ⬜ Pendiente | Facturación y cobro — Stripe |
+| 11 | `scheduler` | ⬜ Pendiente | Órdenes programadas, ventanas de despacho |
+| 12 | `admin` | ⬜ Pendiente | Dashboard despachador/supervisor |
+| 13 | `compliance` | ⬜ Pendiente | Cadena de custodia, firma digital, regulatorio |
+
+---
+
+## CustodyStateMachine — Estados y Transiciones
 
 ```
-R-TRIP-001  Un pasajero no puede tener dos viajes activos simultáneos
-R-TRIP-002  Un conductor no puede tener dos viajes activos simultáneos
-R-TRIP-003  pricing_snapshot es inmutable — solo se escribe al completar, nunca se modifica
-R-TRIP-004  Todas las transiciones de estado usan SELECT FOR UPDATE
-R-DRV-001   go-online requiere: status=approved + sin docs vencidos + vehículo activo
-R-DRV-003   Auto-aprobación de conductor cuando TODOS los docs requeridos están aprobados
-R-AUTH-001  OTP expira en 10 minutos
-R-AUTH-002  Refresh token rotation — el token usado queda revocado inmediatamente
-R-DATA-001  Soft delete siempre (deleted_at) — nunca DELETE
-R-DATA-002  Audit log obligatorio en todo cambio de entidad de negocio
+DRAFT
+  → PENDING_APPROVAL        (cliente o despachador envía a aprobación)
+
+PENDING_APPROVAL
+  → APPROVED                (supervisor aprueba)
+  → REJECTED                (supervisor rechaza con motivo obligatorio)
+  → CANCELLED               (cliente/despachador cancela antes de aprobación)
+
+APPROVED
+  → ASSIGNED                (despachador asigna custodio + copiloto)
+  → CANCELLED               (antes de asignación)
+
+ASSIGNED
+  → CREW_CONFIRMED          (custodio Y copiloto aceptan — ambos requeridos)
+  → REASSIGNED              (despachador reasigna equipo)
+
+CREW_CONFIRMED
+  → EN_ROUTE_TO_PICKUP      (equipo sale hacia el punto de recolección)
+
+EN_ROUTE_TO_PICKUP
+  → AT_PICKUP               (equipo llega al punto de recolección)
+
+AT_PICKUP
+  → IN_TRANSIT              (cargo recibido y cargado — firma digital del cliente)
+  → PICKUP_FAILED           (no se pudo recolectar — motivo obligatorio)
+
+IN_TRANSIT
+  → AT_DELIVERY             (equipo llega al destino)
+  → INCIDENT                (incidente de seguridad reportado)
+
+AT_DELIVERY
+  → DELIVERED               (cargo entregado — firma digital del receptor)
+  → DELIVERY_FAILED         (no se pudo entregar — motivo obligatorio)
+
+DELIVERED
+  → COMPLETED               (orden cerrada, pago procesado)
+
+INCIDENT
+  → IN_TRANSIT              (incidente resuelto, continúa tránsito)
+  → RESOLVED                (incidente resuelto, orden terminada)
+```
+
+**Reglas críticas de la máquina de estados:**
+- Toda transición registra `actor_id`, `actor_role`, `location`, `timestamp` en `order_transitions`
+- `CREW_CONFIRMED` requiere confirmación de **ambos** — custodio y copiloto
+- `IN_TRANSIT` genera `custody_snapshot` inmutable (tipo, valor declarado, equipo, vehículo)
+- `APPROVED` genera `pricing_snapshot` inmutable
+- Toda transición usa `SELECT FOR UPDATE` para evitar race conditions
+- `AT_PICKUP→IN_TRANSIT` y `AT_DELIVERY→DELIVERED` requieren firma digital
+
+---
+
+## Schema de Base de Datos
+
+### Tablas principales
+
+```sql
+-- Tipos de custodia (extensible sin código)
+custody_types (
+  id UUID PK, slug TEXT UNIQUE, name TEXT,
+  value_declaration_schema JSONB,  -- JSON Schema para validar declaraciones
+  active BOOL DEFAULT true, created_at TIMESTAMPTZ
+)
+
+-- Usuarios del sistema (todos los actores)
+users (
+  id UUID PK, phone TEXT UNIQUE, email TEXT UNIQUE,
+  role ENUM('client','custodio','copiloto','dispatcher','supervisor'),
+  first_name TEXT, last_name TEXT,
+  deleted_at TIMESTAMPTZ, created_at TIMESTAMPTZ
+)
+
+-- Clientes (empresa o persona)
+clients (
+  id UUID PK, user_id UUID FK→users,
+  company_name TEXT, rfc TEXT,
+  contact_name TEXT, credit_limit_mxn DECIMAL,
+  deleted_at TIMESTAMPTZ
+)
+
+-- Operadores (custodios y copilotos)
+operators (
+  id UUID PK, user_id UUID FK→users,
+  operator_type ENUM('custodio','copiloto'),
+  license_number TEXT, certifications JSONB,
+  vehicle_id UUID FK→vehicles,
+  status ENUM('available','busy','offline','suspended'),
+  deleted_at TIMESTAMPTZ, created_at TIMESTAMPTZ
+)
+
+-- Vehículos blindados/seguros
+vehicles (
+  id UUID PK, plate TEXT UNIQUE, model TEXT, year INT,
+  gps_device_id TEXT, active BOOL,
+  deleted_at TIMESTAMPTZ
+)
+
+-- Órdenes de custodia (entidad principal)
+custody_orders (
+  id UUID PK, order_number TEXT UNIQUE,
+  client_id UUID FK→clients,
+  custody_type_id UUID FK→custody_types,
+  status ENUM(todos los estados de la máquina),
+  pickup_address JSONB, delivery_address JSONB,
+  scheduled_at TIMESTAMPTZ,
+  pickup_window_start TIMESTAMPTZ, pickup_window_end TIMESTAMPTZ,
+  custodio_id UUID FK→operators,
+  copiloto_id UUID FK→operators,
+  approved_by UUID FK→users, approved_at TIMESTAMPTZ,
+  rejected_reason TEXT,
+  custody_snapshot JSONB,   -- inmutable desde IN_TRANSIT
+  pricing_snapshot JSONB,   -- inmutable desde APPROVED
+  notes TEXT,
+  deleted_at TIMESTAMPTZ, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ
+)
+
+-- Declaración de valores (schema dinámico)
+value_declarations (
+  id UUID PK, order_id UUID FK→custody_orders,
+  custody_type_id UUID FK→custody_types,
+  declared_value JSONB,         -- validado contra custody_types.value_declaration_schema
+  insurance_policy_id TEXT,
+  verified_at TIMESTAMPTZ, verified_by UUID FK→users,
+  created_at TIMESTAMPTZ
+)
+
+-- Audit log de transiciones
+order_transitions (
+  id UUID PK, order_id UUID FK→custody_orders,
+  from_status TEXT, to_status TEXT,
+  actor_id UUID FK→users, actor_role TEXT,
+  location POINT, notes TEXT,
+  digital_signature TEXT,
+  created_at TIMESTAMPTZ
+)
+
+-- Tracking GPS (TimescaleDB hypertable)
+location_readings (
+  time TIMESTAMPTZ NOT NULL,
+  order_id UUID, operator_id UUID, vehicle_id UUID,
+  lat DECIMAL(10,8), lng DECIMAL(11,8),
+  speed_kmh DECIMAL, accuracy_m DECIMAL, heading DECIMAL
+)
+
+-- Alertas de seguridad
+security_alerts (
+  id UUID PK, order_id UUID FK, operator_id UUID FK,
+  alert_type ENUM('panic','tamper','geofence_violation','communication_loss','custom'),
+  severity ENUM('low','medium','high','critical'),
+  location POINT, description TEXT,
+  resolved_at TIMESTAMPTZ, resolved_by UUID FK→users,
+  created_at TIMESTAMPTZ
+)
+
+-- Reglas de precios por tipo de custodia
+pricing_rules (
+  id UUID PK, custody_type_id UUID FK,
+  base_price_mxn DECIMAL, per_km_price DECIMAL,
+  conditions JSONB, active BOOL
+)
+
+-- Pagos
+payments (
+  id UUID PK, order_id UUID FK, amount_mxn DECIMAL,
+  status ENUM('pending','processing','completed','failed','refunded'),
+  stripe_payment_intent_id TEXT,
+  created_at TIMESTAMPTZ
+)
+
+-- Notificaciones
+notifications (
+  id UUID PK, user_id UUID FK, order_id UUID FK,
+  type TEXT, channel ENUM('push','sms','email'),
+  status ENUM('pending','sent','failed'),
+  sent_at TIMESTAMPTZ, created_at TIMESTAMPTZ
+)
 ```
 
 ---
 
-## Trip State Machine
+## Reglas de negocio críticas
 
-```
-Flujo taxi (requiresApproval: false):
-  REQUESTED → SEARCHING → ACCEPTED → DRIVER_EN_ROUTE → DRIVER_ARRIVED → IN_PROGRESS → COMPLETED
-                  ↓           ↓↓            ↓↓               ↓↓
-              CANCELLED   CANCELLED     CANCELLED         CANCELLED
-
-Flujo B2B (requiresApproval: true — custody, cold-chain):
-  REQUESTED → PENDING_APPROVAL → APPROVED → SEARCHING → ACCEPTED → ...
-                    ↓↓               ↓↓
-                CANCELLED        CANCELLED
-```
-
-Estados válidos: `REQUESTED | PENDING_APPROVAL | APPROVED | SEARCHING | ACCEPTED | DRIVER_EN_ROUTE | DRIVER_ARRIVED | IN_PROGRESS | COMPLETED | CANCELLED`
-Actores: `system | driver | passenger | dispatcher`
-Nota: dispatcher actorId siempre null en trip_status_history (FK vs admin_users — ADR-047)
+1. **Aprobación obligatoria** — Toda orden pasa por PENDING_APPROVAL. Sin excepción.
+2. **Regla dos-personas** — Toda orden asigna custodio + copiloto. No se confirma con solo uno.
+3. **custody_snapshot inmutable** — Se genera al entrar a IN_TRANSIT. Nunca se reescribe.
+4. **pricing_snapshot inmutable** — Se genera al entrar a APPROVED. Nunca se reescribe.
+5. **Chain of custody** — Toda transición genera registro en `order_transitions` con actor y GPS.
+6. **Soft delete siempre** — `deleted_at` en toda entidad. Nunca `DELETE` en BD.
+7. **SELECT FOR UPDATE** — En toda transición de estado para evitar race conditions.
+8. **Efectos secundarios fuera de transacción** — Notificaciones, alertas, WebSocket → BullMQ.
+9. **Firma digital en puntos clave** — `AT_PICKUP→IN_TRANSIT` y `AT_DELIVERY→DELIVERED`.
+10. **Tipos escalables** — Agregar tipo = INSERT en `custody_types`. Sin cambios de código.
 
 ---
 
-## Patrones de código obligatorios
+## ADRs registradas
 
-```typescript
-// Orden de capas: routes → controller → service → repository
-// Errores de negocio: throw new BusinessError('CODE')
-// Errores técnicos: throw new TechnicalError('CODE', originalError)
-
-// BusinessError — toMatchObject({ code }) en tests (NO toThrow(new BusinessError(msg)))
-await expect(fn()).rejects.toMatchObject({ code: 'DRIVER_NOT_FOUND' });
-
-// TEXT[] en Knex — pasar array JS directo (pg driver serializa automáticamente)
-service_modes: data.serviceModes   // ✅
-service_modes: db.raw("ARRAY[?]::text[]", [...])  // ❌
-
-// JSONB en Knex — pasar objeto JS directo
-metadata: data.meta    // ✅
-metadata: JSON.stringify(data.meta)  // ❌
-
-// Fastify params — NO usar format:'uuid' sin ajv-formats
-documentId: { type: 'string', minLength: 1 }  // ✅ MVP
-documentId: { type: 'string', format: 'uuid' } // ❌ requiere ajv-formats
-
-// SELECT FOR UPDATE — obligatorio en transiciones de estado
-const trip = await trx('trips').where({ id }).forUpdate().first();
-
-// Efectos secundarios FUERA de transacciones
-await trx('audit_logs').insert({...});  // ✅ dentro
-await queue.add('job', {...});           // ✅ dentro (se ejecuta fuera)
-await externalApi.call();               // ❌ nunca dentro de trx
-```
+| # | Decisión | Estado |
+|---|---|---|
+| ADR-001 | Monolito modular (no microservicios) en MVP | ✅ Vigente |
+| ADR-002 | TimescaleDB para tracking GPS (no InfluxDB) | ✅ Vigente |
+| ADR-003 | BullMQ para efectos secundarios fuera de transacción | ✅ Vigente |
+| ADR-004 | Tipos de custodia vía JSONB schema (no herencia de tablas) | ✅ Vigente |
+| ADR-005 | Aprobación de supervisor obligatoria para toda orden | ✅ Vigente |
+| ADR-006 | Regla dos-personas (custodio + copiloto) en toda orden | ✅ Vigente |
+| ADR-007 | custody_snapshot + pricing_snapshot inmutables | ✅ Vigente |
+| ADR-008 | Soft delete en todas las entidades | ✅ Vigente |
 
 ---
 
 ## Puertos locales
 
-| Servicio | Puerto | Tipo |
-|---|---|---|
-| API (Fastify) | 3333 | App nativa |
-| Web (Next.js) | 3002 | App nativa |
-| Mobile (Metro) | 8081 | App nativa |
-| PostgreSQL | 5432 | Docker |
-| Redis | 6379 | Docker |
-| Grafana | 3000 | Docker |
-| Bull Board | 3001 | Docker |
-| Prometheus | 9090 | Docker |
-| Jaeger | 16686 | Docker |
-
----
-
-## ADRs clave (ver docs/13_decisions_log.md para detalle)
-
-| ADR | Decisión |
+| Servicio | Puerto |
 |---|---|
-| 001 | Monolito modular (no microservicios en MVP) |
-| 008 | SELECT FOR UPDATE en transiciones de estado |
-| 009 | pricing_snapshot inmutable en trips |
-| 013 | Testcontainers sobre mocks de BD |
-| 014 | SDD/TDD en spec/sprintN/ antes de implementar |
-| 016 | Refresh token: híbrido PostgreSQL+Redis |
-| 018 | OTPChannel abstracto — Firebase gratis, sin Twilio |
-| 021 | service_modes TEXT[] multi-vertical (people/cargo/mixed) |
-| 022 | Dev: Docker solo infra, apps nativas con pnpm dev |
-| 023 | Distancia: Haversine × 1.30 road_factor |
-| 024 | WebSocket: Socket.io /passenger + /driver namespaces |
-| 025 | TripStateMachine: grafo de estados, lock en service caller |
-| 026 | Política de cancelación: cargo fijo $50 MXN ≥120s |
-| 027 | Circuit breaker: opossum para Stripe y FCM |
-| 028 | INotificationChannel abstracta: Log (dev) + FCM (prod) |
-| 029 | Scheduler: node-cron cada minuto en proceso principal (MVP monolito) |
-| 030 | Admin panel: Vite 5 + React 19 + TanStack Router/Query + Tailwind (reemplaza Next.js) |
-| 031 | Mapbox en mobile-v2 (reemplaza Google Maps — sin costo por tile en dev) |
-| 032 | Expo Bare Workflow (reemplaza Managed — requiere build nativo para módulos nativos) |
-| 033 | admin_users separado de users (bcrypt, roles=['admin'] en JWT, sin OTP) |
-| 034 | @react-native-community/datetimepicker (UX nativa Android/iOS para DateTimePicker) |
-| 035 | dispatch_window_min por viaje en scheduled_trips DEFAULT 30 (no hardcodeado en scheduler) |
-| 036 | verticals como entidad de primera clase con features JSONB — feature flags sin deploy |
-| 037 | trips.metadata JSONB para extensibilidad por vertical sin migraciones adicionales |
-| 038 | companies + company_users como capa B2B sobre B2C — usuarios compartidos entre empresas |
-| 039 | configurations key-value por entidad (company/user/vertical) con namespace |
-| 040 | temperature_readings como hypertable TimescaleDB — mismo patrón que trip_locations |
-| 041 | custody_events append-only inmutable — cadena de custodia auditable sin posibilidad de borrar |
-| 042 | pricingModel en verticals.features — extensión sin fork de PricingEngine (switch en estimate()) |
-| 043 | document_requirements.vertical_id nullable — backward-compatible; NULL = todos los verticales |
-| 044 | UX mobile vertical-aware vía feature flags — cargoDeclaration + temperatureLog + chainOfCustody |
-| 045 | Clone Kit como documentación estática en docs/VERTICAL_CLONE_GUIDE.md |
-| 046 | Extensibilidad vertical: custodyEventTypes + cargoFields + unitTypeDetermination en features JSONB |
-| 047 | Flujo aprobación opcional: PENDING_APPROVAL + APPROVED + actor dispatcher, activado por requiresApproval en features |
+| API (Fastify) | 3333 |
+| Web admin (Vite) | 3002 |
+| Mobile (Expo) | 8081 |
+| PostgreSQL | 5432 |
+| Redis | 6379 |
+| Bull Board | 3001 |
+| Grafana | 3000 |
 
 ---
 
-## Variables de entorno (apps/api/.env)
+## Patrones de código establecidos
 
-```
-NODE_ENV, PORT=3333, DATABASE_URL, REDIS_URL
-JWT_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_EXPIRES_IN=15m, JWT_REFRESH_EXPIRES_IN=30d
-OTP_PROVIDER=log|firebase, FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
-STRIPE_SECRET_KEY
-CORS_ORIGIN=http://localhost:3002
-LOG_LEVEL=info, OTEL_EXPORTER_OTLP_ENDPOINT
-VERTICAL_SLUG=taxi   # slug del vertical activo (taxi|custody|cold-chain) — Sprint 10 ADR-036
-```
+```typescript
+// Transición de estado — patrón obligatorio
+async function transitionOrder(
+  orderId: string,
+  toStatus: OrderStatus,
+  actor: { id: string; role: ActorRole },
+  opts?: { location?: Point; notes?: string; signature?: string }
+): Promise<CustodyOrder> {
+  return db.transaction(async (trx) => {
+    const order = await trx('custody_orders')
+      .where({ id: orderId })
+      .forUpdate()           // SELECT FOR UPDATE obligatorio
+      .first();
 
----
+    CustodyStateMachine.validateTransition(order.status, toStatus);
 
-## Cobertura de tests requerida
+    await trx('order_transitions').insert({
+      order_id: orderId,
+      from_status: order.status,
+      to_status: toStatus,
+      actor_id: actor.id,
+      actor_role: actor.role,
+      location: opts?.location
+        ? db.raw('POINT(?, ?)', [opts.location.lng, opts.location.lat])
+        : null,
+      notes: opts?.notes,
+      digital_signature: opts?.signature,
+      created_at: new Date(),
+    });
 
-| Módulo | Umbral |
-|---|---|
-| TripStateMachine | 100% líneas y branches |
-| PricingEngine | 100% líneas y branches |
-| PaymentService | 95% líneas, 90% branches |
-| Global | 75% líneas, 70% branches |
+    const [updated] = await trx('custody_orders')
+      .where({ id: orderId })
+      .update({ status: toStatus, updated_at: new Date() })
+      .returning('*');
 
----
-
-## Comandos frecuentes
-
-```bash
-pnpm dev                        # Levanta api + web + mobile en paralelo
-pnpm test                       # Todos los tests (Testcontainers — requiere Docker)
-pnpm run agent:verify:quick     # tsc + tests rápido antes de PR
-pnpm knex migrate:latest        # Correr migraciones pendientes
-pnpm knex seed:run              # Correr seeds
-git add <files> && git commit   # Commit (siempre archivos específicos, no git add .)
+    return updated;
+  });
+  // efectos secundarios → BullMQ FUERA de la transacción
+}
 ```

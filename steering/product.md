@@ -1,82 +1,89 @@
 # Steering — Producto
-
 > Resumen ejecutivo del producto para orientar decisiones de implementación.
-> Fuente completa: docs/01_product.md
+> Actualizado: 2026-05-13
 
 ---
 
-## Qué estamos construyendo
+## Qué es SistemaCustodias
 
-Plataforma de movilidad tipo UBER con base técnica reutilizable para múltiples verticales.
-**Primer vertical:** Taxi en México.
+Plataforma de gestión y seguimiento de servicios de custodia de valores. Permite a empresas y personas solicitar transporte seguro de efectivo, paquetería de alto valor, documentos confidenciales o escolta de personas VIP — con seguimiento GPS en tiempo real, cadena de custodia digital y aprobación supervisada.
 
-## Actores
+---
 
-| Actor | App | Acciones principales |
+## Actores y sus motivaciones
+
+| Actor | Motivación principal | Pain point actual |
 |---|---|---|
-| Pasajero | Mobile (iOS/Android) | Solicitar, seguir y pagar viajes |
-| Conductor | Mobile (iOS/Android) | Aceptar viajes, navegar, cobrar |
-| Administrador | Web (Next.js) | Operar, configurar, aprobar |
+| **Cliente** | Saber dónde está su cargo en todo momento | No hay visibilidad — llaman por teléfono |
+| **Custodio** | Recibir instrucciones claras y reportar incidentes fácil | Coordinación por radio/teléfono, sin registro |
+| **Copiloto** | Confirmar recepción y reportar alertas | No hay sistema — todo es verbal |
+| **Despachador** | Asignar equipos eficientemente y ver todo en un mapa | Spreadsheets y llamadas telefónicas |
+| **Supervisor** | Aprobar órdenes rápido y reaccionar a incidentes | Sin visibilidad hasta que algo sale mal |
 
-## Mercado actual
+---
 
-- País: México · Moneda: MXN · IVA: 16% · Idioma: Español
-- Pagos MVP: Solo tarjeta vía Stripe
-- Expansión Fase 4: Colombia, Brasil
+## Propuesta de valor
 
-## Tipos de servicio (Taxi)
+1. **Transparencia** — El cliente ve en tiempo real dónde está su cargo
+2. **Trazabilidad** — Cadena de custodia digital e inmutable, con firmas
+3. **Seguridad** — Botón de pánico, alertas automáticas, geofencing
+4. **Escalabilidad** — Nuevos tipos de custodia sin cambios de código (JSONB schema)
+5. **Eficiencia** — Despacho automatizado, notificaciones, reducción de llamadas
 
-| Tipo | Capacidad | Descripción |
-|---|---|---|
-| Basic | 4 personas | Vehículo estándar |
-| Plus | 4 personas | Vehículo confort |
-| Premium | 4 personas | Vehículo ejecutivo |
+---
 
-Configurables desde admin — cada tipo tiene tarifa base, costo/km y costo/min independientes.
+## Tipos de custodia (MVP)
 
-## Ciclo de vida del viaje
+| Tipo | Requisitos especiales |
+|---|---|
+| `cash_transport` | Declaración de montos, denominaciones, aseguradora |
+| `high_value_package` | Descripción detallada, valor estimado, seguro obligatorio |
+| `confidential_docs` | Tipo de documento, entidad emisora, nivel de sensibilidad |
+| `vip_escort` | Nombre de persona protegida, nivel de amenaza, restricciones de ruta |
 
-```
-REQUESTED → SEARCHING → ACCEPTED → DRIVER_EN_ROUTE
-→ DRIVER_ARRIVED → IN_PROGRESS → COMPLETED
-```
+---
 
-Cancelaciones: `CANCELLED_BY_PASSENGER` · `CANCELLED_BY_DRIVER` · `CANCELLED_NO_DRIVER` · `NO_SHOW`
-
-## Fases del producto
-
-| Fase | Contenido | Estado |
-|---|---|---|
-| **Fase 1** | MVP Taxi México (sprints 1-7) | **En desarrollo** |
-| Fase 2 | Estabilización: historial, ratings, push, programados | Pendiente |
-| Fase 3 | ML matching, precios dinámicos, detección anomalías | Pendiente |
-| Fase 4 | Delivery, Custodia, LATAM | Pendiente |
-
-## Motor de precios (Fase 1)
-
-Los factores se aplican en orden fijo:
-1. `fixed_amount` → suma al subtotal base
-2. `percentage` → calcula sobre subtotal actualizado
-3. `multiplier` → multiplica el resultado acumulado
-
-El precio final nunca puede ser menor que `min_fare`.
-El IVA se calcula sobre el subtotal (no sobre la tarifa base).
-
-## Onboarding de conductores
+## Flujo principal de una orden
 
 ```
-pending → documents_submitted → under_review → approved
-```
-Con posibilidad de `suspended` o `banned` en cualquier momento.
-La aprobación es **automática** cuando todos los documentos requeridos están aprobados.
-Si un documento vence durante un viaje activo: el viaje termina normalmente, el conductor se suspende después.
+Cliente o Despachador
+  → Crea orden (DRAFT)
+  → Llena declaración de valores
+  → Envía a aprobación (PENDING_APPROVAL)
 
-## Monetización
+Supervisor
+  → Revisa y aprueba (APPROVED) o rechaza (REJECTED)
 
+Despachador
+  → Asigna custodio + copiloto (ASSIGNED)
+
+Custodio + Copiloto
+  → Confirman vía app (CREW_CONFIRMED)
+  → Salen hacia el pickup (EN_ROUTE_TO_PICKUP)
+  → Llegan al pickup (AT_PICKUP)
+  → Cliente firma → cargan cargo (IN_TRANSIT)
+  → Llegan al destino (AT_DELIVERY)
+  → Receptor firma → entregan cargo (DELIVERED)
+
+Sistema
+  → Cierra la orden y cobra (COMPLETED)
 ```
-Tarifa del viaje
-  − Comisión de plataforma   (configurable por región y tipo)
-  = Ganancia neta del conductor
-  + IVA 16%
-  ═ Total cobrado al pasajero
-```
+
+---
+
+## Principios de UX
+
+1. **Fluidez en campo** — Los custodios no tienen tiempo de leer pantallas largas. Botones grandes, acciones claras.
+2. **Visibilidad siempre** — El cliente siempre sabe en qué estado está su orden.
+3. **Pánico nunca oculto** — El botón de pánico es rojo y prominente. Nunca esconder.
+4. **Firma simple** — La firma digital debe ser rápida — canvas con dedo en pantalla táctil.
+5. **Offline-first** — Si el custodio pierde señal, las acciones se encolan y sincronizan.
+
+---
+
+## Decisiones de producto vigentes
+
+- **Aprobación obligatoria** — No existe una orden que salte la aprobación del supervisor
+- **Dos personas mínimo** — Toda orden requiere custodio + copiloto asignados y confirmados
+- **Tipos extensibles** — Un cliente puede necesitar un nuevo tipo; se agrega como INSERT
+- **Mobile primero** — La app mobile es el producto principal; el web es admin/operativo

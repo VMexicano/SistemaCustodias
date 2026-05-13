@@ -1,162 +1,115 @@
 # Steering — Arquitectura
-
 > Decisiones de stack inamovibles y restricciones de arquitectura.
 > Antes de proponer cualquier cambio técnico, leer este archivo completo.
-> Fuentes: docs/03_tech.md · docs/13_decisions_log.md · docs/05_context.md
+> Actualizado: 2026-05-13
 
 ---
 
-## Stack — Decisiones inamovibles
+## Decisiones inamovibles (no debatir en MVP)
 
-Estas decisiones ya fueron tomadas y documentadas. No cambiarlas sin:
-1. Justificación técnica sólida
-2. Actualizar este archivo
-3. Agregar ADR en docs/13_decisions_log.md
-
-| Capa | Tecnología | Versión | Por qué — NO cambiar por |
-|---|---|---|---|
-| Runtime | Node.js | 20 LTS | Stack del equipo — no Bun, no Deno |
-| Lenguaje | TypeScript | 5.x (strict) | Tipado estático — no JS puro |
-| Framework API | **Fastify** | 4.x | 3× throughput vs Express — **no Express, no NestJS** |
-| ORM | **Knex** | 3.x | Query builder con migraciones — **no Prisma, no TypeORM** |
-| Validación | Zod | 3.x | Tipado nativo TS — no Joi, no Yup |
-| BD principal | **PostgreSQL** | 15 | Relacional ACID — **no MongoDB, no MySQL** |
-| Cache / broker | **Redis** | 7 | Estado activo + BullMQ — **no Memcached** |
-| GPS / series de tiempo | **TimescaleDB** | latest-pg15 | Extensión de PG — **no InfluxDB** |
-| Colas | **BullMQ** | 5.x | Sobre Redis — **no Kafka en MVP** |
-| Tiempo real | Socket.io | 4.x | WebSockets con rooms — no SSE |
-| Frontend web | **Next.js + React** | 14 / 18 | App Router, SSR — |
-| Mobile | **React Native** | 0.73+ | Mismo paradigma React — **no Flutter** |
-| Mapas mobile | Google Maps SDK nativo | — | Performance — **no wrapper JS** |
-| Pagos MVP | **Stripe** | — | Solo tarjeta MVP — **no MercadoPago, no efectivo** |
-| Push | FCM + APNs | — | Estándar iOS/Android |
-| SMS / OTP | Twilio | — | |
-| Logs | Pino | 8.x | JSON estructurado, mínimo overhead |
-| Métricas | Prometheus + Grafana | — | Self-hosted |
-| Trazas | OpenTelemetry + Jaeger | — | Portable a Datadog sin cambio de código |
-| Tests unit | Jest + Supertest | 29 / 6 | |
-| Tests E2E | Playwright | 1.x | |
-| Monorepo | Turborepo | — | Builds incrementales |
-| CI/CD | GitHub Actions | — | |
-| Deploy MVP | Railway / Render | — | Simple, BD managed — AWS en > 1k viajes/día |
+| Decisión | Razón |
+|---|---|
+| Monolito modular (no microservicios) | Velocidad de iteración en MVP — ADR-001 |
+| Node.js 20 + TypeScript 5 strict | Ecosistema mobile compartido y tipo-seguro |
+| Fastify 4 (no Express, no NestJS) | Performance + schema-first nativo |
+| PostgreSQL 15 + TimescaleDB | ACID para transacciones críticas + time-series para GPS |
+| Redis 7 para cache y pub-sub | OTP, refresh tokens, WebSocket pub-sub, circuit breaker |
+| BullMQ para colas | Efectos secundarios fuera de transacciones |
+| Knex (no Prisma, no TypeORM) | Control total sobre SQL — crítico para SELECT FOR UPDATE |
+| Expo SDK 54 (no bare workflow) | OTA updates, menor complejidad de build |
+| Mapbox (no Google Maps) | Mejor soporte offline y tracking, mejor pricing para México |
 
 ---
 
-## Arquitectura del sistema
+## Principios de arquitectura
 
-**Patrón:** Monolito modular (ADR-001)
-- No microservicios en MVP
-- Módulos internos bien separados, extraíbles cuando el volumen lo justifique
-- Un solo deployment para el MVP
+### 1. Transacciones de BD solo para estado
 
-**Patrón de módulo interno:**
+Las transacciones DB solo tocan tablas de estado (custody_orders, order_transitions, etc.).
+Los efectos secundarios (notificaciones, WebSocket, alertas) siempre van a BullMQ **después** de que la transacción hace commit.
+
 ```
-routes.ts → controller.ts → service.ts → repository.ts
+❌ Incorrecto: enviar FCM push dentro de db.transaction()
+✅ Correcto: db.transaction() → commit → queue.add('send-notification', ...)
 ```
-- `routes.ts`: solo mapeo de endpoints + validación Zod
-- `controller.ts`: recibe request, llama service, retorna response — sin lógica de negocio
-- `service.ts`: toda la lógica de negocio — inyección de dependencias
-- `repository.ts`: solo acceso a BD con Knex — sin lógica de negocio
+
+### 2. Snapshots inmutables
+
+`custody_snapshot` y `pricing_snapshot` se escriben una sola vez y nunca se modifican.
+Representan el estado acordado en el momento de la orden — son evidencia legal.
+
+### 3. Monolito modular
+
+Cada módulo es autocontenido: `routes + controller + service + repository + types`.
+Los módulos se comunican a través de sus services — nunca importan el repository de otro módulo.
+
+```
+✅ ordersService.getById(id)         ← usa su propio repo
+❌ import operatorsRepository from '../operadores/repository'  ← violación de módulo
+```
+
+### 4. TimescaleDB solo para time-series
+
+La tabla `location_readings` es una hypertable de TimescaleDB.
+Todas las demás tablas son PostgreSQL puro — no mezclar.
 
 ---
 
-## Infraestructura MVP
+## Flujo de datos (C4 — nivel 2)
 
 ```
-Cloudflare (CDN + DDoS + SSL)
-  → Railway / Render
-      → API Service (Node.js + Fastify + Socket.io)
-      → Workers (BullMQ)
-      → Scheduler (Cron cada 1 min)
-      → PostgreSQL + TimescaleDB (Managed)
-      → Redis (Managed)
-      → Prometheus + Grafana + Jaeger
+Cliente/Operador (Mobile)
+  ↕ HTTPS/WSS
+API (Fastify)
+  ├── Módulos de negocio (custody-orders, alerts, tracking, ...)
+  ├── PostgreSQL (estado + audit log)
+  ├── TimescaleDB (location_readings)
+  ├── Redis (OTP, tokens, pub-sub, circuit breaker)
+  └── BullMQ Workers
+        ├── notifications-worker → FCM + SMS
+        ├── tracking-worker → geofence check
+        └── compliance-worker → genera reportes
+
+Despachador/Supervisor (Web)
+  ↕ HTTPS/WSS
+API (Fastify)  [mismo API]
 ```
 
 ---
 
 ## Seguridad
 
-```typescript
-// JWT
-// Access token:  15 minutos
-// Refresh token: 30 días con rotación automática
-interface JWTPayload {
-  sub:    string;    // user_id
-  roles:  string[];  // ['passenger'] | ['driver'] | ['admin']
-  region: string;    // 'MX'
-}
-```
-
-**Rate limits clave:**
-
-| Endpoint | Límite | Ventana |
-|---|---|---|
-| `POST /auth/login` | 5 req | 15 min |
-| `POST /auth/verify-phone` | 3 req | 10 min |
-| `POST /trips` | 10 req | 1 hora |
-| `PATCH /drivers/me/location` | 1000 req | 1 hora |
-| Default | 100 req | 1 min |
-
----
-
-## Concurrencia — Circuit breakers
-
-| Servicio | Timeout | Threshold error | Reset |
-|---|---|---|---|
-| Google Maps | 5 seg | 40% | 60 seg |
-| Stripe | 10 seg | 30% | 120 seg |
-| FCM | 5 seg | 50% | 30 seg |
-| Twilio | 8 seg | 50% | 60 seg |
-
-**Fallbacks:**
-- Google Maps caído → estimación lineal haversine
-- Redis caído → leer estado desde PostgreSQL
-- FCM falla → SMS vía Twilio para notificaciones críticas
-- Stripe falla → 3 reintentos exponenciales → escalación manual
-
----
-
-## Bases de datos — Estructura de keys en Redis
-
-```
-trip:{id}:state              → estado completo del viaje activo (HSET)
-driver:{id}:location         → posición actual del conductor (HSET, TTL 5 min)
-driver:{id}:active_trip      → id del viaje activo del conductor (STRING)
-passenger:{id}:active_trip   → id del viaje activo del pasajero (STRING)
-pricing:factors:{region}     → factores activos cacheados (STRING JSON, TTL 5 min)
-otp:{phone}                  → OTP de verificación (STRING, TTL 10 min)
-blacklist:token:{jti}        → refresh token invalidado (STRING, TTL = tiempo restante)
-```
-
----
-
-## Observabilidad — Métricas clave
-
-```
-trips_active
-drivers_online
-driver_matching_seconds    (histogram)
-trip_fare_mxn              (histogram)
-payment_queue_size
-circuit_breaker.opened
-```
-
----
-
-## Decisiones de arquitectura tomadas (ADRs)
-
-Ver detalle completo en docs/13_decisions_log.md:
-
-| ADR | Decisión |
+| Área | Implementación |
 |---|---|
-| ADR-001 | Monolito modular sobre microservicios |
-| ADR-002 | Fastify sobre Express |
-| ADR-003 | PostgreSQL + Redis + TimescaleDB |
-| ADR-004 | React Native sobre Flutter |
-| ADR-005 | BullMQ + Cron sobre Kafka |
-| ADR-006 | Stripe como único procesador en MVP |
-| ADR-007 | OpenTelemetry sobre Datadog directo |
-| ADR-008 | SELECT FOR UPDATE en transiciones de estado |
-| ADR-009 | pricing_snapshot inmutable en trips |
-| ADR-010 | Scheduler con cron + PostgreSQL |
+| Autenticación | JWT RS256 (15min) + refresh token opaco en Redis (30 días) |
+| Autorización | RBAC por role en cada endpoint — middleware `authorize([roles])` |
+| OTP | 6 dígitos, 5 min TTL, máx 3 intentos, Redis counter |
+| Firma digital | Base64 SVG capturado en canvas, almacenado en order_transitions |
+| Logs | Audit log inmutable en order_transitions — nunca UPDATE |
+| Secrets | Variables de entorno — nunca en código, nunca en git |
+
+---
+
+## Restricciones de escalabilidad (MVP)
+
+- No sharding de BD en MVP — PostgreSQL single node
+- Horizontal scaling del API vía load balancer cuando sea necesario (stateless por diseño)
+- TimescaleDB compresión automática de location_readings > 7 días
+- Bull Board para monitoreo de queues
+
+---
+
+## ADRs vigentes
+
+Ver `docs/13_decisions_log.md` para el registro completo con pros/contras.
+
+| ADR | Resumen |
+|---|---|
+| ADR-001 | Monolito modular |
+| ADR-002 | TimescaleDB para GPS |
+| ADR-003 | BullMQ para efectos secundarios |
+| ADR-004 | JSONB para tipos de custodia extensibles |
+| ADR-005 | Aprobación obligatoria (nunca opcional) |
+| ADR-006 | Regla dos-personas |
+| ADR-007 | Snapshots inmutables |
+| ADR-008 | Soft delete universal |

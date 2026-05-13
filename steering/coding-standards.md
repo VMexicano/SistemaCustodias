@@ -1,253 +1,154 @@
 # Steering — Estándares de Código
-
 > Convenciones y patrones obligatorios para todo el codebase.
-> Fuentes: docs/04_structure.md · docs/07_skills.md
+> Actualizado: 2026-05-13
+
+---
+
+## Reglas absolutas (nunca violar)
+
+```
+✗ NUNCA usar `any` en TypeScript
+✗ NUNCA hacer DELETE en BD — siempre soft delete (deleted_at)
+✗ NUNCA reescribir custody_snapshot o pricing_snapshot después de generados
+✗ NUNCA ejecutar efectos secundarios dentro de una transacción DB
+✗ NUNCA hacer transiciones de estado sin SELECT FOR UPDATE
+✗ NUNCA saltarse la validación de roles en un endpoint protegido
+```
+
+---
+
+## Patrón de módulo (siempre este orden)
+
+```
+{módulo}.routes.ts        → registra rutas, define schemas de request/response
+{módulo}.controller.ts    → extrae datos del request, llama al service, devuelve response
+{módulo}.service.ts       → lógica de negocio, orquesta repository y efectos secundarios
+{módulo}.repository.ts    → queries a la BD con Knex — sin lógica de negocio
+{módulo}.schemas.ts       → schemas Zod o JSON Schema para validación
+{módulo}.types.ts         → interfaces TypeScript del módulo
+```
+
+---
+
+## Inyección de dependencias
+
+```typescript
+// ✅ Correcto — DI explícita
+export function buildOrdersService(db: Knex, queue: Queue): OrdersService {
+  const repo = buildOrdersRepository(db);
+  return { /* methods */ };
+}
+
+// ❌ Incorrecto — importación directa de instancias globales
+import { db } from '../db';
+```
+
+---
+
+## Transiciones de estado
+
+```typescript
+// Patrón obligatorio para toda transición
+async function transition(
+  orderId: string,
+  toStatus: OrderStatus,
+  actor: Actor,
+  opts?: TransitionOptions
+): Promise<CustodyOrder> {
+  return db.transaction(async (trx) => {
+    // 1. SELECT FOR UPDATE — obligatorio
+    const order = await trx('custody_orders').where({ id: orderId }).forUpdate().first();
+
+    // 2. Validar transición
+    CustodyStateMachine.validateTransition(order.status, toStatus);
+
+    // 3. Registrar en audit log
+    await trx('order_transitions').insert({
+      order_id: orderId,
+      from_status: order.status,
+      to_status: toStatus,
+      actor_id: actor.id,
+      actor_role: actor.role,
+      location: opts?.location ? db.raw('POINT(?,?)', [...]) : null,
+      digital_signature: opts?.signature,
+      created_at: new Date(),
+    });
+
+    // 4. Actualizar estado
+    const [updated] = await trx('custody_orders')
+      .where({ id: orderId })
+      .update({ status: toStatus, updated_at: new Date() })
+      .returning('*');
+
+    return updated;
+  });
+  // 5. Efectos secundarios FUERA de la transacción → BullMQ
+}
+```
 
 ---
 
 ## Nomenclatura
 
-| Tipo | Convención | Ejemplo |
+| Elemento | Convención | Ejemplo |
 |---|---|---|
-| Archivos | kebab-case | `trip-state-machine.ts` |
-| Clases | PascalCase | `TripStateMachine` |
-| Funciones / métodos | camelCase | `calculateFare` |
-| Constantes | UPPER_SNAKE_CASE | `VALID_TRANSITIONS` |
-| Interfaces / types | PascalCase | `Trip`, `CreateTripDto` |
-| Enums | PascalCase | `TripStatus` |
-| Variables de entorno | UPPER_SNAKE_CASE | `DATABASE_URL` |
-| Tablas de BD | snake_case | `trip_status_history` |
+| Archivos | kebab-case | `custody-orders.service.ts` |
+| Variables/funciones | camelCase | `createOrder`, `orderId` |
+| Clases/Interfaces | PascalCase | `CustodyOrder`, `OrderStatus` |
+| Constantes | UPPER_SNAKE_CASE | `MAX_OTP_ATTEMPTS` |
+| Rutas API | kebab-case | `/custody-orders/:id/confirm-crew` |
+| Campos BD | snake_case | `custody_type_id`, `deleted_at` |
+| Eventos BullMQ | kebab-case | `send-notification`, `check-geofence` |
 
 ---
 
-## Estructura de módulo (patrón obligatorio)
+## Manejo de errores
 
-Cada módulo del API tiene exactamente estos archivos:
+```typescript
+// Errores de dominio — siempre con códigos de negocio
+throw new AppError('INVALID_TRANSITION', 400, `Cannot transition from ${from} to ${to}`);
+throw new AppError('CREW_INCOMPLETE', 422, 'Both custodio and copiloto must be assigned');
+throw new AppError('SIGNATURE_REQUIRED', 422, 'Digital signature is required for this transition');
 
-```
-src/modules/{module}/
-├── {module}.routes.ts       ← solo mapeo de endpoints + validación Zod
-├── {module}.controller.ts   ← recibe request, llama service, retorna response
-├── {module}.service.ts      ← TODA la lógica de negocio, dependencias inyectadas
-├── {module}.repository.ts   ← solo acceso a BD con Knex, sin lógica
-├── {module}.schema.ts       ← tipos Zod de request y response
-├── {module}.types.ts        ← interfaces TypeScript del módulo
-└── __tests__/
-    ├── {module}.service.test.ts       ← unit tests (mocks)
-    └── {module}.integration.test.ts   ← integration tests (BD real)
+// El error handler de Fastify convierte AppError → HTTP response estructurado
+{ "error": "INVALID_TRANSITION", "message": "...", "statusCode": 400 }
 ```
 
 ---
 
-## Patrones de código obligatorios
+## Validación de datos
 
-### Endpoint con autenticación
-
-```typescript
-// routes.ts — solo mapeo, sin lógica
-router.post('/trips', {
-  schema:    { body: CreateTripSchema },
-  onRequest: [authenticate, authorize('passenger')],
-}, tripController.create);
-
-// controller.ts — sin lógica de negocio
-async create(req: FastifyRequest<{ Body: CreateTripDto }>, reply) {
-  const trip = await this.tripService.create(req.user.id, req.body);
-  return reply.status(201).send({ success: true, data: { trip } });
-}
-
-// service.ts — TODA la lógica aquí
-async create(passengerId: string, dto: CreateTripDto): Promise<Trip> {
-  // validaciones de negocio
-  // orquestación de repositorios
-  // emisión de eventos
-}
-
-// repository.ts — solo BD, sin lógica
-async create(data: CreateTripData): Promise<Trip> {
-  const [trip] = await db('trips').insert(data).returning('*');
-  return trip;
-}
-```
-
-### Transacción con efectos secundarios
-
-```typescript
-// service.ts
-async doSomething(data: SomeDto): Promise<Result> {
-  return await db.transaction(async (trx) => {
-    // 1. Leer con lock si hay concurrencia
-    const entity = await trx('table').where({ id: data.id }).forUpdate().first();
-
-    // 2. Validar con BusinessError
-    if (!entity) throw BusinessErrors.NOT_FOUND(data.id);
-
-    // 3. Modificar
-    const [updated] = await trx('table')
-      .where({ id: data.id })
-      .update({ ...changes, updated_at: new Date() })
-      .returning('*');
-
-    // 4. Efectos secundarios — encolar DENTRO de la trx, ejecutan FUERA
-    await queue.add('some.job', { id: updated.id });
-
-    // 5. Auditoría siempre
-    await trx('audit_logs').insert({
-      entity_type: 'table',
-      entity_id:   data.id,
-      action:      'updated',
-      actor_type:  'user',
-      actor_id:    data.actorId,
-      new_value:   updated,
-    });
-
-    return updated;
-  });
-}
-```
-
-### Servicio externo con Circuit Breaker
-
-```typescript
-// adapter.ts
-export class ExternalServiceAdapter {
-  private breaker = createCircuitBreaker(
-    this.callService.bind(this),
-    { name: 'service-name', timeout: 5_000, errorThreshold: 40 }
-  );
-
-  async doCall(input: Input): Promise<Output> {
-    try {
-      return await this.breaker.fire(input);
-    } catch (error) {
-      if (error.message === 'Breaker is open') {
-        return this.fallback(input);  // Degradación controlada
-      }
-      throw new IntegrationError('service-name', 'ERR_001', 'Descripción', error);
-    }
-  }
-}
-```
-
-### Unit test de servicio (patrón AAA)
-
-```typescript
-describe('SomeService', () => {
-  let service:  SomeService;
-  let repo:     jest.Mocked<SomeRepository>;
-
-  beforeEach(() => {
-    repo    = createMock<SomeRepository>();
-    service = new SomeService(repo);
-  });
-
-  it('descripción del comportamiento esperado', async () => {
-    // Arrange
-    const input = SomeFactory.build();
-    repo.findById.mockResolvedValue(input);
-
-    // Act
-    const result = await service.doSomething(input.id);
-
-    // Assert
-    expect(result).toMatchObject({ status: 'expected' });
-    expect(repo.update).toHaveBeenCalledWith(input.id, expect.any(Object));
-  });
-});
-```
+- **Entrada de request:** Zod schemas en `{módulo}.schemas.ts`
+- **value_declaration:** JSON Schema validation contra `custody_types.value_declaration_schema`
+- **Regla:** Validar en la frontera del sistema (controller) — no en el repository
 
 ---
 
-## TypeScript — Reglas estrictas
+## Queries con Knex
 
 ```typescript
 // ✅ Correcto
-interface CreateTripDto {
-  originLat:  number;
-  originLng:  number;
-  destLat:    number;
-  destLng:    number;
-  tripTypeId: string;
-}
+const orders = await db('custody_orders')
+  .where({ client_id: clientId, deleted_at: null })
+  .orderBy('created_at', 'desc')
+  .limit(20)
+  .offset(page * 20);
 
-// ✗ NUNCA — any explícito
-function doSomething(data: any) { ... }
-
-// ✅ Si necesitas tipo desconocido:
-function doSomething(data: unknown) { ... }
-```
-
-Configuración `tsconfig.json`:
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true
-  }
-}
+// ❌ Incorrecto — lógica de negocio en el repository
+// ❌ Incorrecto — SQL raw innecesario cuando Knex lo cubre
 ```
 
 ---
 
-## Respuestas de la API — Formato estándar
+## Soft delete
 
 ```typescript
-// Éxito
-{ "success": true, "data": { ... } }
+// ✅ Siempre soft delete
+await db('operators').where({ id }).update({ deleted_at: new Date() });
 
-// Error de negocio (4xx)
-{
-  "success": false,
-  "error": {
-    "code": "PASSENGER_HAS_ACTIVE_TRIP",
-    "message": "El pasajero ya tiene un viaje activo"
-  }
-}
+// ❌ Nunca
+await db('operators').where({ id }).delete();
 
-// Error de validación (422)
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "fields": [{ "field": "phone", "message": "Formato inválido" }]
-  }
-}
-```
-
----
-
-## Commits (formato convencional)
-
-```
-feat(trips):     implementar transición DRIVER_ARRIVED → IN_PROGRESS
-fix(pricing):    corregir aplicación de factores stackables
-refactor(auth):  extraer validación OTP a método privado
-test(state-machine): agregar casos de cancelación tardía
-docs(context):   documentar nueva decisión de radio de búsqueda
-chore(deps):     actualizar fastify a 4.28.0
-```
-
-Formato: `tipo(módulo): descripción en minúsculas, imperativo`
-
----
-
-## Checklist por módulo nuevo
-
-```
-[ ] routes.ts — endpoints con validación Zod, sin lógica
-[ ] controller.ts — sin lógica de negocio
-[ ] service.ts — lógica completa, dependencias inyectadas
-[ ] repository.ts — solo Knex, sin lógica
-[ ] schema.ts — tipos Zod de request/response
-[ ] types.ts — interfaces TypeScript
-[ ] __tests__/{module}.service.test.ts
-[ ] __tests__/{module}.integration.test.ts
-[ ] Registrar módulo en src/app.ts
-[ ] npm run agent:verify:quick pasa
-[ ] docs/06_memory.md actualizado
-[ ] Sin any en TypeScript
-[ ] Sin secrets hardcoded
-[ ] Sin DELETE (solo soft delete con deleted_at)
-[ ] Audit log para cambios de entidades de negocio
+// ✅ Siempre filtrar en queries
+.where({ deleted_at: null })
 ```
