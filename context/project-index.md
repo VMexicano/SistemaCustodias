@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 4 completado. Módulo value-declaration activo con validación Ajv + CustodyClientStack mobile.
+> Última actualización: 2026-05-14 — Sprint 5 completado. Módulo custody-tracking activo: GPS tracking GPS tiempo real, WebSocket /tracking namespace, geofence worker BullMQ, 35 tests 100% cobertura.
 
 ---
 
@@ -59,7 +59,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 04 | `custody-orders` | ✅ Sprint 3 | State machine 18 estados, 20 endpoints, snapshots, audit log |
 | 05 | `value-declaration` | ✅ Sprint 4 | POST/GET /orders/:id/value-declaration, Ajv JSONB schema, GET /custody-types, CustodyClientStack mobile |
 | 06 | `routing` | ⬜ Pendiente | Planeación y validación de rutas seguras |
-| 07 | `tracking` | ⬜ Pendiente | GPS tiempo real — TimescaleDB + WebSocket |
+| 07 | `custody-tracking` | ✅ Sprint 5 | GPS tiempo real — TimescaleDB + WebSocket + geofence worker, 35 tests |
 | 08 | `alerts` | ⬜ Pendiente | Botón de pánico, tamper detection, incidentes |
 | 09 | `notifications` | ⬜ Pendiente | FCM push + SMS fallback + circuit breaker |
 | 10 | `payments` | ⬜ Pendiente | Facturación y cobro — Stripe |
@@ -303,6 +303,8 @@ notifications (
 | ADR-011 | GPS: IGpsProvider interface — MockAdapter MVP, WinlogAdapter posterior | ✅ Vigente |
 | ADR-012 | CustodyEvent envelope con doble timestamp anti-fraude | ✅ Vigente |
 | ADR-013 | Modelo de precios en dos niveles: por viaje (cliente) + renta fija (empresa custodio) | ✅ Vigente |
+| ADR-014 | custody-tracking como módulo separado de tracking UBER_BASE | ✅ Vigente |
+| ADR-015 | Socket.io namespace injection via setIo() post-construcción | ✅ Vigente |
 
 ---
 

@@ -8,9 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 4 COMPLETO — value-declaration + CustodyClientStack ✅
-**Fecha último cierre:** 2026-05-14
-**Tipo de tarea próxima:** [TRACKING] — Sprint 5 — GPS tracking + WebSocket tiempo real
+**Sprint:** 5 EN CURSO — tracking GPS + WebSocket + TimescaleDB
+**Fecha de sesión:** 2026-05-14
+**Tipo de contexto:** [TRACKING]
+**Objetivo:** Implementación completa del módulo tracking (backend + tests + snapshot)
 
 ---
 
@@ -90,21 +91,26 @@
 
 ---
 
-## Próxima sesión — Sprint 5
+## Sprint 5 — COMPLETO ✅ (2026-05-14)
 
-**Objetivo:** GPS tracking tiempo real + WebSocket + TimescaleDB
+**Resultado:** custody-tracking GPS tiempo real implementado y aprobado por QA.
 
-**Alcance Sprint 5:**
-- Módulo `tracking` — PATCH /orders/:id/location (custodio/copiloto reportan GPS)
-- GET /orders/:id/track (supervisor/dispatcher ve posición en tiempo real)
-- WebSocket channel para actualizaciones live de posición
-- TimescaleDB hypertable `location_readings` (M-047, ya existe)
-- Integración con custody_snapshot: validar que equipo esté en ruta
+**Tareas completadas:**
+- [x] TRACK-001: Módulo custody-tracking completo (6 archivos módulo + queue + worker)
+- [x] TRACK-QA-001: 35 tests, CustodyTrackingService 100%, geofence.utils 100%
+- [x] ADR-014 + ADR-015 documentados
+- [x] 6 artefactos de retrospectiva actualizados
+
+---
+
+## Próxima sesión — Sprint 6
+
+**Objetivo:** Módulo `alerts` — AlertEngine (botón de pánico, tamper, geofence full integration, 95% cobertura)
 
 **Cargar en contexto:**
-- `context/project-index.md`
-- `context/snapshots/tracking.snapshot.md`
-- `steering/architecture.md`
+- `context/snapshots/alerts.snapshot.md` (principal)
+- `context/snapshots/custody-orders.snapshot.md` (secundario — estados activos)
+- `steering/testing-standards.md` (AlertEngine umbral 95%)
 
 ---
 

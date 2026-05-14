@@ -236,6 +236,55 @@ El sistema tiene dos tipos de usuarios mobile: clientes y operadores (custodio/c
 
 ---
 
+## ADR-014: custody-tracking como módulo separado de tracking UBER_BASE
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+Al implementar el GPS tracking para custodia de valores, ya existía un módulo `tracking/` del UBER_BASE que usa tabla `trip_locations` con schema diferente (`trip_id, driver_id, recorded_at`). El dominio custodia usa `location_readings` (`order_id, operator_id, time` TimescaleDB). Los services están en uso activo por `DriversService` y `TripsService`.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| Extender TrackingService existente | Un solo servicio | Acopla dominios, rompe UBER_BASE, violación de monolito modular |
+| Módulo `custody-tracking/` separado | Módulos autocontenidos, sin riesgo | Dos servicios de tracking en el codebase |
+| Refactorizar TrackingService a interfaz común | Reutilizable | Sobre-ingeniería para MVP |
+
+**Decisión:** Módulo `custody-tracking/` completamente separado. El `TrackingService` UBER_BASE sigue intacto. El `CustodyTrackingService` es el canónico para el dominio custodia.
+
+**Consecuencias:**
+- Dos services de tracking en el proyecto — es intencional y documentado
+- La disciplina de módulos autocontenidos se mantiene (ADR-001)
+- Cuando UBER_BASE se deprece, `tracking/` se elimina sin tocar `custody-tracking/`
+
+---
+
+## ADR-015: Socket.io namespace injection via setIo() post-construcción
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+El `CustodyTrackingService` necesita hacer broadcast via Socket.io (`io.to(room).emit()`). El order de inicialización en `app.ts` obliga a construir el service antes de que el plugin de Socket.io registre el namespace `/tracking`. Inyectar `io` en el constructor causaría dependencia circular de orden.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| io en constructor | Explícito | Fuerza orden de inicialización — frágil |
+| setIo() post-construcción | Flexible, testeable | Riesgo de olvidar la inyección |
+| io como parámetro en cada método | Stateless | Verbose, repetitivo |
+| Pub/sub via Redis (no socket directo) | Desacoplado | Latencia adicional para MVP |
+
+**Decisión:** `setIo(io: Namespace): void` en el service. El routes plugin lo llama justo después de crear el namespace. El service verifica `this.io?.to(...)` — si io es null, el broadcast se omite silenciosamente y el endpoint HTTP funciona igualmente.
+
+**Consecuencias:**
+- Tests unitarios no necesitan Socket.io real
+- El endpoint HTTP nunca falla por ausencia de WebSocket
+- Patrón replicable para otros módulos que necesiten broadcast (alerts, compliance)
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown

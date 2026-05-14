@@ -91,7 +91,11 @@ export type BusinessErrorCode =
   | 'PLATE_ALREADY_EXISTS'
   // Value declarations
   | 'VALUE_DECLARATION_NOT_FOUND'
-  | 'CUSTODY_TYPE_NOT_FOUND';
+  | 'CUSTODY_TYPE_NOT_FOUND'
+  // Custody tracking
+  | 'ORDER_NOT_TRACKABLE'
+  | 'OPERATOR_NOT_ASSIGNED'
+  | 'NO_LOCATION_DATA';
 
 const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   PASSENGER_HAS_ACTIVE_TRIP: 409,
@@ -165,6 +169,9 @@ const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   PLATE_ALREADY_EXISTS: 409,
   VALUE_DECLARATION_NOT_FOUND: 404,
   CUSTODY_TYPE_NOT_FOUND: 404,
+  ORDER_NOT_TRACKABLE: 409,
+  OPERATOR_NOT_ASSIGNED: 403,
+  NO_LOCATION_DATA: 404,
 };
 
 export class BusinessError extends Error {

@@ -170,6 +170,10 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 4 Custodias] apiClient mock en React Native tests: usar factory explícita en jest.mock — auto-mock carga axios que falla en entorno React Native con "Cannot cancel a stream that already has a reader"
 ✓ [Sprint 17] FK cross-table para actores no-users: si el actor es supervisor/dispatcher, campos con FK → users.id deben recibir actorId: null; preservar identidad en columnas dedicadas
 ✓ [Sprint 17] Smoke specs: documentar el contrato auth completo de cada actor (supervisor = username+password vs cliente/operador = OTP)
+✓ [Sprint 5 Custodias] Cuando existe un servicio UBER_BASE con nombre base similar (ej: TrackingService), el spec debe declarar explícitamente el nombre del nuevo módulo custodia (ej: CustodyTrackingService) para evitar conflictos de importación en app.ts
+✓ [Sprint 5 Custodias] Campos NULLABLE en response types (speed_kmh: number|null, heading: number|null): el spec debe listar explícitamente tests para "campo null → retorna null, no undefined ni 0" — son branches silenciosos que la cobertura detecta tarde
+✓ [Sprint 5 Custodias] Socket.io namespace en módulos nuevos: declarar en el spec si el io se inyecta en el constructor o via setIo() post-construcción, y qué pasa si io es undefined en entorno de test (debe no lanzar, solo no emitir)
+✓ [Sprint 5 Custodias] Workers BullMQ que escriben directamente a tablas de módulos no-implementados: documentar en scope_out que es una dependencia temporal y debe refactorizarse cuando el módulo dueño (ej: alerts) se implemente
 ```
 
 ### Checklist de completitud por tarea — campos adicionales (Sprint 4+)

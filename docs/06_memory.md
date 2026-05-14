@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-14 — Sprint 4 SistemaCustodias: value-declaration backend (Ajv JSONB schema, POST/GET /orders/:id/value-declaration, GET /custody-types) + CustodyClientStack mobile (3 pantallas: SelectCustodyType → NewCustodyOrder → ValueDeclaration) + 22 nuevos tests.
+> **Última actualización:** 2026-05-14 — Sprint 5 SistemaCustodias: módulo custody-tracking GPS tiempo real (POST /tracking/location, GET /tracking/:orderId/current|history, WebSocket namespace /tracking, geofence-check BullMQ worker, geofence.utils haversine) + 35 tests (100% cobertura CustodyTrackingService + geofence.utils).
 
 ---
 
@@ -22,7 +22,8 @@
 | Pricing Engine | ✅ Completo | Sprint 4: PricingEngine 100%, POST /trips/estimate, 28 tests |
 | Realtime | ✅ Completo | Sprint 4: Socket.io /passenger /driver, auth JWT, 27 tests |
 | Payments | ✅ Completo | Sprint 5: PaymentService + Stripe test mode + BullMQ worker + circuit breaker |
-| Tracking | ✅ Completo | Sprint 7: TrackingService, GET /trips/:id/track, migration 030 device_tokens |
+| Tracking (UBER_BASE) | ✅ Completo | Sprint 7: TrackingService, GET /trips/:id/track, migration 030 device_tokens |
+| Custody Tracking | ✅ Sprint 5 | GPS custody: POST /tracking/location, GET current|history, WebSocket /tracking, geofence worker, 35 tests 100% cobertura |
 | Notifications | ✅ Completo | Sprint 5: NotificationService + INotificationChannel + BullMQ worker + circuit breaker |
 | Scheduler | ✅ Completo | Sprint 6: cron cada minuto, SCHEDULED state, recordatorios 24h/1h/15m |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
@@ -36,6 +37,27 @@
 ---
 
 ## Próximas Tareas — Orden Recomendado
+
+### Sprint 5 SistemaCustodias — custody-tracking GPS ✅ COMPLETO (2026-05-14)
+```
+[x] TRACK-001: módulo custody-tracking completo
+    [x] custody-tracking.types.ts
+    [x] custody-tracking.repository.ts (insertReading, getCurrentLocation, getHistory)
+    [x] custody-tracking.service.ts (validación de estado, operador asignado, Socket.io broadcast, BullMQ enqueue)
+    [x] custody-tracking.controller.ts
+    [x] custody-tracking.routes.ts (POST /tracking/location, GET /tracking/:orderId/current|history, WS namespace)
+    [x] geofence.utils.ts (haversineDistance, distanceToPolyline, isOutsideRoute)
+    [x] geofence.queue.ts (BullMQ Queue 'geofence-check')
+    [x] geofence-check.worker.ts (verifica desvío 500m, INSERT security_alerts deduplicado 60s)
+    [x] business-error.ts: ORDER_NOT_TRACKABLE (409), OPERATOR_NOT_ASSIGNED (403), NO_LOCATION_DATA (404)
+    [x] app.ts wiring
+[x] TRACK-QA-001: 35 tests (32 backend + 3 QA gap closure)
+    [x] CustodyTrackingService: 100% lines / 100% branches
+    [x] geofence.utils: 100% lines / 100% branches
+[x] ADR-014: custody-tracking módulo separado del TrackingService UBER_BASE
+[x] ADR-015: setIo() post-construcción para Socket.io namespace injection
+[x] TypeScript: 0 errores
+```
 
 ### Sprint 4 SistemaCustodias — value-declaration + CustodyClientStack ✅ COMPLETO (2026-05-14)
 ```

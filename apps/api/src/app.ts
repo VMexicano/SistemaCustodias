@@ -97,6 +97,11 @@ import { ValueDeclarationRepository } from './modules/value-declaration/value-de
 import { ValueDeclarationService } from './modules/value-declaration/value-declaration.service.js';
 import { valueDeclarationRoutes } from './modules/value-declaration/value-declaration.routes.js';
 import { custodyTypesRoutes } from './modules/custody-types/custody-types.routes.js';
+import { CustodyTrackingRepository } from './modules/custody-tracking/custody-tracking.repository.js';
+import { CustodyTrackingService } from './modules/custody-tracking/custody-tracking.service.js';
+import { custodyTrackingRoutes } from './modules/custody-tracking/custody-tracking.routes.js';
+import { initGeofenceQueue, geofenceQueue } from './queues/geofence.queue.js';
+import { registerGeofenceWorker } from './workers/geofence-check.worker.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -436,6 +441,24 @@ export async function buildApp() {
     prefix: '/orders/:id/value-declaration',
     valueDeclarationService,
   });
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — custody-tracking module (Sprint 5)
+  // ---------------------------------------------------------------------------
+
+  initGeofenceQueue(redis);
+  const custodyTrackingRepo = new CustodyTrackingRepository(db);
+  const custodyTrackingService = new CustodyTrackingService(
+    custodyTrackingRepo,
+    db,
+    redis,
+    geofenceQueue,
+  );
+  await app.register(custodyTrackingRoutes, {
+    prefix: '/tracking',
+    custodyTrackingService,
+  });
+  registerGeofenceWorker(db, redis);
 
   // ---------------------------------------------------------------------------
   // Health check endpoint

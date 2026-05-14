@@ -1,18 +1,31 @@
 # Snapshot: tracking
 > GPS tiempo real — TimescaleDB, WebSocket, geocerca.
-> Última actualización: 2026-05-13 — Sprint 0
+> Última actualización: 2026-05-14 — Sprint 5 COMPLETO ✅
+
+---
+
+## Estado de cobertura (Sprint 5)
+
+| Archivo | Lines | Branches | Estado |
+|---|---|---|---|
+| custody-tracking.service.ts | 100% | 100% | ✅ |
+| geofence.utils.ts | 100% | 100% | ✅ |
+
+Umbrales requeridos: CustodyTrackingService ≥90% lines / ≥80% branches · geofence.utils 100%/100% — **APROBADO**
+
+Tests: 35 passed, 0 failed (2 suites)
 
 ---
 
 ## Archivo(s) principal(es)
 
 ```
-apps/api/src/modules/tracking/
-  tracking.routes.ts
-  tracking.controller.ts
-  tracking.service.ts
-  tracking.repository.ts
-  tracking.types.ts
+apps/api/src/modules/custody-tracking/
+  custody-tracking.routes.ts
+  custody-tracking.controller.ts
+  custody-tracking.service.ts
+  custody-tracking.repository.ts
+  custody-tracking.types.ts
   geofence.utils.ts
 ```
 
