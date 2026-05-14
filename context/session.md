@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 7 PENDIENTE — módulo notifications (FCM push + SMS fallback + circuit breaker)
+**Sprint:** 8 PENDIENTE — módulo payments (Stripe facturación + cobro automático al COMPLETED)
 **Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [NOTIFICATIONS]
-**Objetivo:** Próxima sesión: implementar el módulo notifications para alertas critical/high
+**Tipo de contexto:** [PAYMENTS]
+**Objetivo:** Próxima sesión: implementar el módulo payments para órdenes de custodia
 
 ---
 
@@ -100,6 +100,20 @@
 - [x] TRACK-QA-001: 35 tests, CustodyTrackingService 100%, geofence.utils 100%
 - [x] ADR-014 + ADR-015 documentados
 - [x] 6 artefactos de retrospectiva actualizados
+
+---
+
+## Sprint 7 — COMPLETO ✅ (2026-05-14)
+
+**Resultado:** Módulo custody-notifications implementado y aprobado. 44 tests, 100% cobertura.
+
+**Entregables:**
+- CustodyNotificationService: FCM push + SMS fallback + CircuitBreaker Redis
+- BullMQ worker con routing table 12 estados de orden + alertas critical/high
+- Integración con AlertEngine (panic → enqueue) y CustodyOrders (todas las transiciones)
+- Migración M-052 aplicada (tabla notifications)
+- ADR-017 documentado
+- Módulo usa `custody-notifications/` (evita conflicto con UBER_BASE `notifications/`)
 
 ---
 

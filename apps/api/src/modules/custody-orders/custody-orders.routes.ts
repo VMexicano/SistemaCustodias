@@ -1,12 +1,15 @@
 import type { FastifyInstance, FastifyPluginOptions, RouteHandlerMethod } from 'fastify';
+import type { Queue } from 'bullmq';
 import { authenticate } from '../../shared/middleware/authenticate.js';
 import { authorize } from '../../shared/middleware/authorize.js';
 import { tenantGuard } from '../../shared/middleware/tenant.middleware.js';
 import { CustodyOrdersController } from './custody-orders.controller.js';
 import type { CustodyOrdersService } from './custody-orders.service.js';
+import type { CustodyNotificationJobData } from '../custody-notifications/custody-notifications.types.js';
 
 export interface OrdersRoutesOptions extends FastifyPluginOptions {
   ordersService: CustodyOrdersService;
+  notificationsQueue?: Queue<CustodyNotificationJobData>;
 }
 
 const addressSchema = {
@@ -124,7 +127,7 @@ export async function ordersRoutes(
   app: FastifyInstance,
   options: OrdersRoutesOptions,
 ): Promise<void> {
-  const ctrl = new CustodyOrdersController(options.ordersService);
+  const ctrl = new CustodyOrdersController(options.ordersService, options.notificationsQueue);
 
   app.post('/', {
     schema: createOrderSchema,

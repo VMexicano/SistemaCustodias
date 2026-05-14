@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 6 completado. Módulo alerts activo: AlertEngine (panic→INCIDENT, dedup 30s, severity map, resolución supervisor-only), 34 tests 100% cobertura, ADR-016.
+> Última actualización: 2026-05-14 — Sprint 7 completado. Módulo custody-notifications activo: FCM push + SMS fallback + CircuitBreaker Redis, BullMQ worker routing 12 estados, integración AlertEngine + CustodyOrders, 44 tests 100% cobertura, ADR-017.
 
 ---
 
@@ -61,7 +61,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 06 | `routing` | ⬜ Pendiente | Planeación y validación de rutas seguras |
 | 07 | `custody-tracking` | ✅ Sprint 5 | GPS tiempo real — TimescaleDB + WebSocket + geofence worker, 35 tests |
 | 08 | `alerts` | ✅ Sprint 6 | AlertEngine (panic/tamper/geofence/custom), severity map, dedup 30s, supervisor-only critical, 34 tests |
-| 09 | `notifications` | ⬜ Pendiente | FCM push + SMS fallback + circuit breaker |
+| 09 | `custody-notifications` | ✅ Sprint 7 | FCM push + SMS fallback + CircuitBreaker Redis (threshold 5/60s), routing 12 estados, 44 tests |
 | 10 | `payments` | ⬜ Pendiente | Facturación y cobro — Stripe |
 | 11 | `scheduler` | ⬜ Pendiente | Órdenes programadas, ventanas de despacho |
 | 12 | `admin` | ⬜ Pendiente | Dashboard despachador/supervisor |
@@ -306,6 +306,7 @@ notifications (
 | ADR-014 | custody-tracking como módulo separado de tracking UBER_BASE | ✅ Vigente |
 | ADR-015 | Socket.io namespace injection via setIo() post-construcción | ✅ Vigente |
 | ADR-016 | AlertEngine como autoridad central para creación de alertas | ✅ Vigente |
+| ADR-017 | CustodyNotificationService: FCM + SMS fallback + CircuitBreaker en Redis | ✅ Vigente |
 
 ---
 

@@ -1,436 +1,321 @@
-# Sprint 7 — Design (SDD)
-> Generado: 2026-04-11 · Sprint 7 Mobile MVP
+# Sprint 7 — Design: Módulo Notifications
+
+**Sprint:** 7 — SistemaCustodias
+**Fecha:** 2026-05-14
 
 ---
 
-## Arquitectura del sistema al finalizar Sprint 7
+## Arquitectura del módulo
+
+> **NOTA ADR-014 aplicado:** Ya existe `modules/notifications/` del UBER_BASE (viajes, pagos, sin SMS fallback).
+> El módulo custody se crea como `custody-notifications/` — módulo separado, sin tocar el UBER_BASE.
+> Se reutiliza `INotificationChannel` del UBER_BASE para la parte FCM push.
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        UBER_BASE — MVP Completo                     │
-├──────────────────────────┬──────────────────────────────────────────┤
-│  apps/mobile             │  apps/api                                │
-│  ─────────────────────── │  ──────────────────────────────────────  │
-│  React Native 0.73 bare  │  Fastify 4 + TypeScript 5 strict        │
-│  React Navigation 6      │  Módulos: auth, users, drivers, trips,  │
-│  React Query 5           │  pricing, payments, notifications,       │
-│  Zustand 4 + MMKV        │  scheduler, admin, tracking (NEW)       │
-│  Socket.io 4 client      │                                          │
-│  react-native-maps       │  BullMQ workers: payment, notification  │
-│  @rn-firebase/messaging  │  Scheduler: node-cron cada 1 min        │
-│  Axios + JWT interceptor │                                          │
-├──────────────────────────┤  Socket.io 4: /passenger, /driver       │
-│  apps/web                │                                          │
-│  ─────────────────────── ├──────────────────────────────────────────┤
-│  Vite 5 + React 19       │  PostgreSQL 15 + TimescaleDB             │
-│  TanStack Router/Query   │  Redis 7 + BullMQ                       │
-│  Tailwind                │  TimescaleDB hypertable: trip_locations  │
-└──────────────────────────┴──────────────────────────────────────────┘
+apps/api/src/modules/custody-notifications/
+  custody-notifications.types.ts
+  custody-notifications.repository.ts
+  custody-notifications.service.ts  ← lógica central — 80% cobertura
+  sms.client.ts                      ← ISmsClient + LogSmsClient (MVP)
+  circuit-breaker.ts                 ← closed/open/half-open en Redis — 90% cobertura
+
+apps/api/src/queues/
+  custody-notifications.queue.ts    ← BullMQ Queue 'custody-notifications'
+
+apps/api/src/workers/
+  custody-notification-worker.ts    ← BullMQ Worker, routing table, push+SMS+CB
 ```
 
----
+### Dependencias del CustodyNotificationService
 
-## Estructura de directorios — módulos nuevos
+```typescript
+// Reutiliza INotificationChannel del UBER_BASE para FCM push
+import type { INotificationChannel } from '../notifications/notification.channel.interface.js';
 
-### `apps/mobile/` (reestructuración completa)
-
-```
-apps/mobile/
-├── android/                          ← Scaffolding nativo (MOB-001)
-├── ios/                              ← Scaffolding nativo (MOB-001)
-├── src/
-│   ├── navigation/
-│   │   ├── RootNavigator.tsx         ← Stack pasajero vs conductor según role
-│   │   ├── PassengerNavigator.tsx
-│   │   └── DriverNavigator.tsx
-│   ├── screens/
-│   │   ├── passenger/
-│   │   │   ├── HomeScreen.tsx
-│   │   │   ├── EstimateScreen.tsx
-│   │   │   └── ActiveTripScreen.tsx
-│   │   ├── driver/
-│   │   │   ├── OnlineScreen.tsx
-│   │   │   ├── TripRequestScreen.tsx
-│   │   │   └── ActiveTripScreen.tsx
-│   │   └── shared/
-│   │       └── LoginScreen.tsx
-│   ├── services/
-│   │   ├── api.client.ts             ← Axios + interceptor JWT refresh
-│   │   ├── socket.client.ts          ← Socket.io wrapper + reconexión
-│   │   ├── location.service.ts       ← GPS polling + cola MMKV (MOB-004)
-│   │   └── notification.service.ts   ← FCM token register + handlers (MOB-005)
-│   ├── stores/
-│   │   ├── auth.store.ts             ← Zustand + MMKV persist (tokens, userId, role)
-│   │   ├── trip.store.ts             ← activeTrip, driverLocation, tripStatus
-│   │   └── driver.store.ts           ← online, activeTrip, pendingRequest
-│   ├── hooks/
-│   │   ├── useTrip.ts                ← React Query wrappers
-│   │   ├── useEstimate.ts
-│   │   └── useDriverStatus.ts
-│   └── index.ts                      ← Entry point
-├── package.json
-└── tsconfig.json
-```
-
-### `apps/api/src/modules/tracking/` (TRACK-001)
-
-```
-apps/api/src/modules/tracking/
-├── tracking.routes.ts
-├── tracking.controller.ts
-├── tracking.service.ts
-└── tracking.repository.ts
+class CustodyNotificationService {
+  constructor(
+    private repo: CustodyNotificationsRepository,
+    private pushChannel: INotificationChannel,  // ← reutiliza LogNotificationChannel / FCMNotificationChannel
+    private sms: ISmsClient,
+    private circuitBreaker: CircuitBreaker,
+    private db: Knex,          // para lookup de users.phone y role-based recipients
+  ) {}
+}
 ```
 
 ---
 
-## Diseño de componentes clave
-
-### AuthStore (Zustand + MMKV)
+## Migración M-052
 
 ```typescript
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { MMKV } from 'react-native-mmkv';
-
-const storage = new MMKV({ id: 'auth' });
-
-interface AuthState {
-  accessToken: string | null;
-  refreshToken: string | null;
-  userId: string | null;
-  role: 'passenger' | 'driver' | null;
-  setTokens: (access: string, refresh: string) => void;
-  setUser: (userId: string, role: 'passenger' | 'driver') => void;
-  logout: () => void;
-}
-
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      accessToken: null,
-      refreshToken: null,
-      userId: null,
-      role: null,
-      setTokens: (access, refresh) => set({ accessToken: access, refreshToken: refresh }),
-      setUser: (userId, role) => set({ userId, role }),
-      logout: () => set({ accessToken: null, refreshToken: null, userId: null, role: null }),
-    }),
-    {
-      name: 'auth-store',
-      storage: createJSONStorage(() => ({
-        getItem: (key) => storage.getString(key) ?? null,
-        setItem: (key, value) => storage.set(key, value),
-        removeItem: (key) => storage.delete(key),
-      })),
-    }
-  )
-);
-```
-
-### TripStore (Zustand — sin persist)
-
-```typescript
-interface TripState {
-  activeTrip: ActiveTrip | null;
-  driverLocation: { lat: number; lng: number } | null;
-  tripStatus: TripStatus | null;
-  setActiveTrip: (trip: ActiveTrip) => void;
-  updateDriverLocation: (lat: number, lng: number) => void;
-  updateStatus: (status: TripStatus) => void;
-  clearTrip: () => void;
-}
-
-type TripStatus = 'REQUESTED' | 'SEARCHING' | 'ACCEPTED' | 'DRIVER_EN_ROUTE'
-                | 'DRIVER_ARRIVED' | 'IN_PROGRESS' | 'COMPLETED'
-                | 'CANCELLED_BY_PASSENGER' | 'CANCELLED_BY_DRIVER';
-```
-
-### DriverStore (Zustand — sin persist)
-
-```typescript
-interface DriverState {
-  online: boolean;
-  activeTrip: ActiveTrip | null;
-  pendingRequest: TripRequest | null;
-  setOnline: (online: boolean) => void;
-  setActiveTrip: (trip: ActiveTrip) => void;
-  setPendingRequest: (request: TripRequest | null) => void;
-}
-
-interface TripRequest {
-  tripId: string;
-  originAddress: string;
-  destinationAddress: string;
-  estimatedDistanceKm: number;
-  estimatedFare: number;
-  expiresAt: number; // timestamp
-}
-```
-
-### API Client (Axios + interceptor JWT)
-
-```typescript
-// services/api.client.ts
-import axios from 'axios';
-import { useAuthStore } from '../stores/auth.store';
-
-export const apiClient = axios.create({
-  baseURL: process.env.API_BASE_URL ?? 'http://localhost:3000',
-  timeout: 10_000,
+// migrations/052_create_notifications_table.ts
+await knex.schema.createTable('notifications', (t) => {
+  t.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+  t.uuid('user_id').notNullable().references('id').inTable('users');
+  t.uuid('order_id').nullable().references('id').inTable('custody_orders');
+  t.uuid('alert_id').nullable().references('id').inTable('security_alerts');
+  t.text('channel').notNullable();                // push | sms | email
+  t.text('priority').notNullable();               // critical | high | normal | low
+  t.text('status').notNullable().defaultTo('pending'); // pending | sent | failed | skipped
+  t.text('title').notNullable();
+  t.text('body').notNullable();
+  t.timestamptz('sent_at').nullable();
+  t.timestamptz('created_at').notNullable().defaultTo(knex.fn.now());
 });
-
-apiClient.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    if (error.response?.status === 401) {
-      const { refreshToken, setTokens, logout } = useAuthStore.getState();
-      if (!refreshToken) { logout(); return Promise.reject(error); }
-      try {
-        const { data } = await axios.post(`${apiClient.defaults.baseURL}/auth/refresh`,
-          { refreshToken });
-        setTokens(data.accessToken, data.refreshToken);
-        error.config.headers.Authorization = `Bearer ${data.accessToken}`;
-        return apiClient.request(error.config);
-      } catch {
-        logout();
-      }
-    }
-    return Promise.reject(error);
-  }
-);
 ```
 
-### Socket.io Client Wrapper
+---
+
+## notifications.types.ts
 
 ```typescript
-// services/socket.client.ts
-import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from '../stores/auth.store';
+export type NotificationChannel = 'push' | 'sms' | 'email';
+export type NotificationPriority = 'critical' | 'high' | 'normal' | 'low';
+export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'skipped';
 
-let socket: Socket | null = null;
-
-export function getSocket(namespace: 'passenger' | 'driver'): Socket {
-  if (socket?.connected) return socket;
-  const token = useAuthStore.getState().accessToken;
-  socket = io(`${process.env.API_BASE_URL}/${namespace}`, {
-    auth: { token },
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionAttempts: Infinity,
-  });
-  return socket;
+export interface Notification {
+  id: string;
+  user_id: string;
+  order_id: string | null;
+  alert_id: string | null;
+  channel: NotificationChannel;
+  priority: NotificationPriority;
+  status: NotificationStatus;
+  title: string;
+  body: string;
+  sent_at: string | null;
+  created_at: string;
 }
 
-export function disconnectSocket(): void {
-  socket?.disconnect();
-  socket = null;
+export interface SendNotificationPayload {
+  user_id: string;
+  order_id?: string;
+  alert_id?: string;
+  channel: NotificationChannel;
+  priority: NotificationPriority;
+  title: string;
+  body: string;
 }
+
+export interface NotifyOrderTransitionPayload {
+  order_id: string;
+  to_status: string;
+  client_id: string | null;
+  custodio_id: string | null;
+  copiloto_id: string | null;
+  tenant_id: string;
+}
+
+export interface NotifyAlertPayload {
+  alert_id: string;
+  order_id: string;
+  alert_type: string;
+  severity: string;
+  tenant_id: string;
+}
+
+export type NotificationJobData =
+  | { type: 'order-transition'; payload: NotifyOrderTransitionPayload }
+  | { type: 'alert'; payload: NotifyAlertPayload };
 ```
 
-### LocationService (GPS + cola MMKV)
+---
+
+## fcm.client.ts
 
 ```typescript
-// services/location.service.ts
-import Geolocation from '@react-native-community/geolocation';
-import { MMKV } from 'react-native-mmkv';
-import { apiClient } from './api.client';
+export interface IFcmClient {
+  send(token: string, title: string, body: string, data?: Record<string, string>): Promise<void>;
+}
 
-const storage = new MMKV({ id: 'location-queue' });
-const QUEUE_KEY = 'location_queue';
-const MAX_QUEUE_SIZE = 100;
-
-export class LocationService {
-  private intervalId: ReturnType<typeof setInterval> | null = null;
-
-  start(): void {
-    this.intervalId = setInterval(() => {
-      Geolocation.getCurrentPosition(
-        ({ coords }) => this.send(coords.latitude, coords.longitude),
-        () => {} // silently ignore errors — already queued
-      );
-    }, 5_000);
-  }
-
-  stop(): void {
-    if (this.intervalId) clearInterval(this.intervalId);
-    this.intervalId = null;
-  }
-
-  private async send(lat: number, lng: number): Promise<void> {
-    const queued = this.getQueue();
-    queued.push({ lat, lng, timestamp: Date.now() });
-    if (queued.length > MAX_QUEUE_SIZE) queued.shift(); // discard oldest
-    this.saveQueue(queued);
-    await this.flush();
-  }
-
-  async flush(): Promise<void> {
-    const queue = this.getQueue();
-    if (queue.length === 0) return;
-    // Send most recent only to minimize API calls
-    const { lat, lng } = queue[queue.length - 1];
-    try {
-      await apiClient.patch('/drivers/me/location', { lat, lng });
-      this.saveQueue([]); // clear on success
-    } catch {
-      // keep queue for next attempt
-    }
-  }
-
-  private getQueue(): Array<{ lat: number; lng: number; timestamp: number }> {
-    const raw = storage.getString(QUEUE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  }
-
-  private saveQueue(q: Array<{ lat: number; lng: number; timestamp: number }>): void {
-    storage.set(QUEUE_KEY, JSON.stringify(q));
+export class LogFcmClient implements IFcmClient {
+  async send(token: string, title: string, body: string): Promise<void> {
+    // Logs without sending — MVP mode
+    console.log(`[FCM] token=${token.slice(0, 8)}... title="${title}" body="${body}"`);
   }
 }
 ```
 
 ---
 
-## TrackingService (backend)
+## sms.client.ts
 
 ```typescript
-// tracking.service.ts
-interface TrackingService {
-  recordLocation(driverId: string, lat: number, lng: number): Promise<void>;
-  getTripLocations(tripId: string, limit?: number): Promise<TripLocation[]>;
+export interface ISmsClient {
+  send(phone: string, message: string): Promise<void>;
 }
 
-interface TripLocation {
-  lat: number;
-  lng: number;
-  recordedAt: Date;
+export class LogSmsClient implements ISmsClient {
+  async send(phone: string, message: string): Promise<void> {
+    // Logs without sending — MVP mode
+    console.log(`[SMS] to=${phone} message="${message}"`);
+  }
 }
 ```
-
-**Lógica de `recordLocation`:**
-1. Buscar en Redis: `driver:{driverId}:active_trip` → `tripId`
-2. Si existe `tripId`, insertar en `trip_locations`: `{ trip_id, driver_id, lat, lng, recorded_at: NOW() }`
-3. Actualizar Redis: `driver:{driverId}:location` → `{ lat, lng }` (TTL 5 min) — comportamiento existente del drivers service
 
 ---
 
-## Contratos de API nuevos (Sprint 7)
+## circuit-breaker.ts
 
-### TRACK-001-A: `GET /trips/:id/track`
-
-```
-GET /trips/:tripId/track
-Authorization: Bearer {token}
-Roles permitidos: passenger (solo su viaje), driver (solo su viaje), admin
-```
-
-**Response 200:**
 ```typescript
-{
-  tripId: string;
-  locations: Array<{
-    lat: number;    // ej: 19.4326
-    lng: number;    // ej: -99.1332
-    recordedAt: string; // ISO 8601
-  }>;
-  count: number;
-}
-```
+const CB_KEY_PREFIX = 'cb:fcm';
+const CB_THRESHOLD = 5;
+const CB_WINDOW_MS = 60_000;        // 5 fallos en 60s → open
+const CB_COOLDOWN_MS = 5 * 60_000;  // open por 5 minutos
+const CB_HALF_OPEN_TTL_MS = 30_000; // medio-abierto por 30s
 
-**Errores:**
-| HTTP | Código interno | Condición |
-|---|---|---|
-| 404 | TRIP_NOT_FOUND | El viaje no existe |
-| 403 | FORBIDDEN | El usuario no pertenece al viaje |
-| 400 | TRIP_NOT_STARTED | El viaje aún no está en progreso |
+export type CircuitState = 'closed' | 'open' | 'half-open';
+
+export class CircuitBreaker {
+  constructor(
+    private redis: Redis,
+    private threshold = CB_THRESHOLD,
+    private windowMs = CB_WINDOW_MS,
+    private cooldownMs = CB_COOLDOWN_MS,
+  ) {}
+
+  async getState(): Promise<CircuitState>
+  async isOpen(): Promise<boolean>           // true = NO enviar FCM
+  async recordFailure(): Promise<void>       // incrementa contador, abre si threshold
+  async recordSuccess(): Promise<void>       // regresa a closed si half-open
+  async reset(): Promise<void>               // force-close (admin/tests)
+}
+
+// Patrón Redis:
+// Hash key: 'cb:fcm'
+// Fields: state, failure_count, opened_at, next_attempt_at
+// TTL auto-expira cuando cooldown termina → vuelta a closed
+```
 
 ---
 
-### TRACK-001-B: `POST /users/me/device-token`
+## NotificationService — lógica central
 
-```
-POST /users/me/device-token
-Authorization: Bearer {token}
-Roles permitidos: passenger, driver
-```
-
-**Request:**
 ```typescript
-{
-  token: string;          // FCM token del dispositivo
-  platform: 'ios' | 'android';
-}
+async send(payload: SendNotificationPayload): Promise<Notification>
+  // 1. Crear registro en notifications con status='pending'
+  // 2. Si channel = 'push':
+  //    a. isOpen() → si true → skip FCM, ir a SMS fallback
+  //    b. Buscar fcm_token del usuario (device_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 1)
+  //    c. Si no hay token → skipped, registrar
+  //    d. Intentar fcm.send()
+  //    e. Si falla → circuitBreaker.recordFailure() → intentar sms.send()
+  //    f. Si éxito → circuitBreaker.recordSuccess()
+  // 3. Si channel = 'sms':
+  //    a. Buscar phone del usuario (users WHERE id=?)
+  //    b. sms.send()
+  // 4. Actualizar registro: status='sent'/'failed'/'skipped', sent_at=NOW()
+  // 5. return notification
 ```
-
-**Response 200:**
-```typescript
-{
-  registered: true;
-}
-```
-
-**Errores:**
-| HTTP | Código interno | Condición |
-|---|---|---|
-| 400 | INVALID_TOKEN | token vacío o malformado |
 
 ---
 
-## Migration 030 — device_tokens
+## notification-worker.ts
 
 ```typescript
-// migrations/030_device_tokens.ts
-export async function up(knex: Knex): Promise<void> {
-  await knex.schema.createTable('device_tokens', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
-    table.text('token').notNullable();
-    table.enu('platform', ['ios', 'android']).notNullable();
-    table.boolean('active').notNullable().defaultTo(true);
-    table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-    table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
-    table.index(['user_id', 'active']);
-    table.unique(['token']); // un token solo puede estar registrado una vez
+// Tabla de routing — to_status → destinatarios + canal + prioridad
+const ORDER_ROUTING: Record<string, Array<{ role_field: 'client_id'|'custodio_id'|'copiloto_id'|'supervisor'|'dispatcher', channel: NotificationChannel, priority: NotificationPriority }>> = {
+  PENDING_APPROVAL: [
+    { role_field: 'supervisor', channel: 'push', priority: 'high' },
+    { role_field: 'supervisor', channel: 'sms',  priority: 'high' },
+  ],
+  APPROVED: [
+    { role_field: 'client_id',    channel: 'push', priority: 'normal' },
+    { role_field: 'custodio_id',  channel: 'push', priority: 'normal' },
+    { role_field: 'copiloto_id',  channel: 'push', priority: 'normal' },
+    { role_field: 'dispatcher',   channel: 'push', priority: 'normal' },
+  ],
+  // ... resto de estados
+  INCIDENT: [
+    { role_field: 'supervisor', channel: 'push', priority: 'critical' },
+    { role_field: 'supervisor', channel: 'sms',  priority: 'critical' },
+    { role_field: 'dispatcher', channel: 'push', priority: 'critical' },
+    { role_field: 'dispatcher', channel: 'sms',  priority: 'critical' },
+  ],
+};
+
+// Worker
+export function registerNotificationWorker(
+  redis: Redis,
+  notificationService: NotificationService,
+  db: Knex,
+): Worker<NotificationJobData>
+```
+
+---
+
+## Integración con custody-orders
+
+El controller de órdenes enqueue después de cada transición de estado exitosa:
+
+```typescript
+// En custody-orders.controller.ts (patrón para TODAS las transiciones)
+const order = await ordersService.approve(orderId, actor);
+if (notificationsQueue) {
+  await notificationsQueue.add('notification', {
+    type: 'order-transition',
+    payload: {
+      order_id: order.id,
+      to_status: order.status,
+      client_id: order.client_id,
+      custodio_id: order.custodio_id,
+      copiloto_id: order.copiloto_id,
+      tenant_id: req.user.tenant_id,
+    },
   });
 }
+```
 
-export async function down(knex: Knex): Promise<void> {
-  await knex.schema.dropTable('device_tokens');
+El `notificationsQueue` se inyecta como parámetro opcional al registrar el plugin de rutas:
+```typescript
+// app.ts
+app.register(ordersRoutes, { ordersService, notificationsQueue });
+```
+
+---
+
+## Integración con AlertEngine
+
+AlertEngine recibe `notificationsQueue` como 4to parámetro opcional:
+
+```typescript
+class AlertEngine {
+  constructor(
+    private repo: AlertsRepository,
+    private db: Knex,
+    private ordersService: CustodyOrdersService,
+    private notificationsQueue?: Queue,   // ← nuevo, opcional
+  ) {}
+}
+
+// En createAlert(), después de ordersService.reportIncident():
+if (alert.alert_type === 'panic' && this.notificationsQueue) {
+  await this.notificationsQueue.add('notification', {
+    type: 'alert',
+    payload: {
+      alert_id: createdAlert.id,
+      order_id: payload.order_id,
+      alert_type: 'panic',
+      severity: 'critical',
+      tenant_id, // del lookup de la orden
+    },
+  });
 }
 ```
 
 ---
 
-## ADRs aplicables a este sprint
+## ADR-017 — NotificationService: FCM + SMS fallback + CircuitBreaker
 
-| ADR | Decisión |
+**Decisión:** FCM como canal primario con SMS como fallback garantizado. CircuitBreaker en Redis controla cuando FCM está degradado. Para MVP, se usan `LogFcmClient` y `LogSmsClient` que loguean sin envío real — el circuito se conecta a clientes reales cuando las credenciales estén disponibles.
+
+**Razón:** Evita la complejidad de Firebase Admin SDK en desarrollo. Las interfaces `IFcmClient` e `ISmsClient` permiten swap sin cambio de código en `NotificationService`.
+
+---
+
+## Cobertura requerida
+
+| Módulo | Umbral |
 |---|---|
-| ADR-001 | Monolito modular — tracking es un módulo interno, no microservicio |
-| ADR-003 | TimescaleDB para `trip_locations` (hypertable ya existe) |
-| ADR-004 | React Native sobre Flutter (inamovible) |
-| ADR-008 | SELECT FOR UPDATE en transiciones de estado (aplica a trip status changes desde mobile) |
-| ADR-009 | pricing_snapshot inmutable — mobile solo lee, no escribe |
-| ADR-024 | Socket.io 4 con namespaces /passenger y /driver (JWT en handshake) |
-| **ADR-031** | **React Navigation 6** para routing mobile — vs Expo Router (descartado, proyecto bare RN sin Expo) |
-| **ADR-032** | **@react-native-community/geolocation** para GPS — vs react-native-background-geolocation (descartado, licencia comercial) |
-| **ADR-033** | **@react-native-firebase/messaging** para FCM — vs notifee (descartado, complejidad innecesaria en MVP) |
-
----
-
-## Variables de entorno nuevas requeridas
-
-| Variable | Descripción | Ejemplo |
-|---|---|---|
-| `GOOGLE_MAPS_API_KEY_ANDROID` | Google Maps para Android | `AIza...` |
-| `GOOGLE_MAPS_API_KEY_IOS` | Google Maps para iOS | `AIza...` |
-| `GOOGLE_SERVICES_JSON` | Path al google-services.json de Firebase | `android/app/google-services.json` |
-| `GOOGLE_SERVICE_INFO_PLIST` | Path al GoogleService-Info.plist de Firebase | `ios/GoogleService-Info.plist` |
-| `API_BASE_URL` | URL del backend desde el dispositivo | `http://10.0.2.2:3000` (emulador Android) |
-
-> Nota: `FCM_SERVER_KEY` ya debe estar en el backend desde Sprint 5 (NotificationService FCMChannel).
+| `NotificationService` | ≥ 80% lines / ≥ 75% branches |
+| `CircuitBreaker` | ≥ 90% lines / ≥ 85% branches |

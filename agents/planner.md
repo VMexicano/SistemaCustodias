@@ -161,6 +161,9 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 9] pnpm node-linker=hoisted puede enmascarar deps no declaradas: verificar explícitamente todas las deps del workspace mobile
 ✓ [Sprint 9] Deduplicación de notificaciones: marcar el flag "enviado" ANTES de encolar el job
 ✓ [Sprint 9] Guard de idempotencia en schedulers: la condición IS NULL DEBE estar en el WHERE de la query SQL, no solo en código de aplicación
+✓ [Sprint 7-Custodias] Antes de nombrar módulo custody: verificar que modules/{nombre}/ no existe en UBER_BASE — si existe, usar custody-{nombre}/ (ADR-014)
+✓ [Sprint 7-Custodias] Snapshots de módulos pendientes: actualizar ruta del módulo si hay conflicto con UBER_BASE antes de iniciar el sprint
+✓ [Sprint 7-Custodias] Métodos privados con DB lookup: el spec debe indicar patrón de mock esperado (Knex chain .where().select().first()) para que QA no improvise
 ✓ [Sprint 9] Repositorios dentro de transacciones: si el service llama repo.create() dentro de db.transaction(trx), SIEMPRE pasar trx al repositorio
 ✓ [Sprint 14] Migrations + seeds que dependen de índices: verificar que el seed usa ON CONFLICT y que el índice/constraint matching existe en la migración
 ✓ [Sprint 4 Custodias] Ajv como dep directa: aunque Fastify incluye ajv internamente, si el service lo instancia explícitamente, declararlo como dependencia directa (pnpm add ajv ajv-formats)

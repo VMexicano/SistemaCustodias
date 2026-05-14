@@ -105,6 +105,12 @@ import { registerGeofenceWorker } from './workers/geofence-check.worker.js';
 import { AlertsRepository } from './modules/alerts/alerts.repository.js';
 import { AlertEngine } from './modules/alerts/alert-engine.js';
 import { alertsRoutes, orderAlertsRoutes } from './modules/alerts/alerts.routes.js';
+import { CustodyNotificationsRepository } from './modules/custody-notifications/custody-notifications.repository.js';
+import { CustodyNotificationService } from './modules/custody-notifications/custody-notifications.service.js';
+import { LogSmsClient } from './modules/custody-notifications/sms.client.js';
+import { CircuitBreaker } from './modules/custody-notifications/circuit-breaker.js';
+import { initCustodyNotificationsQueue, custodyNotificationsQueue } from './queues/custody-notifications.queue.js';
+import { registerCustodyNotificationWorker } from './workers/custody-notification-worker.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -427,11 +433,11 @@ export async function buildApp() {
 
   // ---------------------------------------------------------------------------
   // Dependency wiring — custody orders module (Sprint 3)
+  // (notificationsQueue wired below after initCustodyNotificationsQueue)
   // ---------------------------------------------------------------------------
 
   const custodyOrdersRepo = new CustodyOrdersRepository(db);
   const custodyOrdersService = new CustodyOrdersService(custodyOrdersRepo, db);
-  await app.register(ordersRoutes, { prefix: '/orders', ordersService: custodyOrdersService });
 
   // ---------------------------------------------------------------------------
   // Dependency wiring — value-declaration module (Sprint 4)
@@ -463,11 +469,32 @@ export async function buildApp() {
   });
 
   // ---------------------------------------------------------------------------
+  // Dependency wiring — custody-notifications module (Sprint 7)
+  // ---------------------------------------------------------------------------
+
+  initCustodyNotificationsQueue(redis);
+
+  const custodyNotifRepo = new CustodyNotificationsRepository(db);
+  const circuitBreaker = new CircuitBreaker(redis);
+  const smsClient = new LogSmsClient();
+  const custodyNotificationService = new CustodyNotificationService(
+    custodyNotifRepo,
+    notificationChannel,
+    smsClient,
+    circuitBreaker,
+    db,
+  );
+  registerCustodyNotificationWorker(redis, custodyNotificationService, db);
+
+  // Register orders routes now that custodyNotificationsQueue is initialized
+  await app.register(ordersRoutes, { prefix: '/orders', ordersService: custodyOrdersService, notificationsQueue: custodyNotificationsQueue });
+
+  // ---------------------------------------------------------------------------
   // Dependency wiring — alerts module (Sprint 6)
   // ---------------------------------------------------------------------------
 
   const alertsRepo = new AlertsRepository(db);
-  const alertEngine = new AlertEngine(alertsRepo, db, custodyOrdersService);
+  const alertEngine = new AlertEngine(alertsRepo, db, custodyOrdersService, custodyNotificationsQueue);
   await app.register(alertsRoutes, { prefix: '/alerts', alertEngine, alertsRepo, db });
   await app.register(orderAlertsRoutes, { prefix: '/orders', alertEngine, alertsRepo, db });
 

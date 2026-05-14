@@ -310,6 +310,31 @@ En Sprint 5 el `geofence-check.worker.ts` insertaba directamente en `security_al
 
 ---
 
+## ADR-017: CustodyNotificationService — FCM + SMS fallback + CircuitBreaker en Redis
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+Las alertas críticas (panic, tamper) y las transiciones de estado de órdenes de custodia requieren notificaciones push (FCM) con SMS como canal de respaldo. El módulo UBER_BASE `notifications/` ya existe pero solo tiene FCM sin SMS fallback ni circuit breaker. Era necesario un módulo custody-específico que agregue resiliencia.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| Extender `modules/notifications/` UBER_BASE | Sin duplicación | Acopla dominios, rompe UBER_BASE, viola monolito modular (ADR-001) |
+| Módulo `custody-notifications/` separado | Independiente, sin riesgo para UBER_BASE | Reutiliza `INotificationChannel` del UBER_BASE — dependencia mínima |
+| Nueva interfaz FCM propia | Sin dependencia cruzada | Duplica código de FCM ya funcional en UBER_BASE |
+
+**Decisión:** Módulo `custody-notifications/` separado (patrón ADR-014). Reutiliza `INotificationChannel` del UBER_BASE solo para la abstracción de FCM (no sus implementaciones). Agrega `ISmsClient + LogSmsClient` y `CircuitBreaker` en Redis (`cb:fcm:custody`).
+
+**Consecuencias:**
+- CircuitBreaker: 5 fallos FCM en 60s → open por 5 minutos, luego half-open con probe
+- SMS siempre disponible como fallback — no sujeto al circuit breaker
+- Para MVP: `LogFcmClient` (via LogNotificationChannel) y `LogSmsClient` (logs sin envío real)
+- Al activar FCM real: intercambiar `LogNotificationChannel` por `FCMNotificationChannel` en `app.ts` — sin cambios de código en el servicio
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown

@@ -38,6 +38,27 @@
 
 ## Próximas Tareas — Orden Recomendado
 
+### Sprint 7 SistemaCustodias — módulo custody-notifications ✅ COMPLETO (2026-05-14)
+```
+[x] NOTIF-001: módulo custody-notifications completo
+    [x] custody-notifications.types.ts — CustodyNotification, SendCustodyNotificationPayload, NotifyOrderTransitionPayload, NotifyAlertPayload, CustodyNotificationJobData
+    [x] custody-notifications.repository.ts — create, updateStatus, findByOrderId
+    [x] custody-notifications.service.ts — FCM push primary + SMS fallback + CircuitBreaker
+    [x] sms.client.ts — ISmsClient + LogSmsClient (MVP)
+    [x] circuit-breaker.ts — closed/open/half-open en Redis (threshold 5/60s, cooldown 5min)
+    [x] custody-notifications.queue.ts — BullMQ Queue 'custody-notifications'
+    [x] custody-notification-worker.ts — routing table 12 estados + alert routing
+    [x] migración M-052 — tabla notifications (applied ✅)
+    [x] alert-engine.ts modificado — +notificationsQueue (4to param opcional)
+    [x] custody-orders.controller.ts modificado — +enqueue en todas las transiciones
+    [x] app.ts wiring — CircuitBreaker + LogSmsClient + CustodyNotificationService + worker
+[x] NOTIF-QA-001: 44 tests — circuit-breaker.test.ts (24) + custody-notification-service.test.ts (20)
+    [x] CircuitBreaker: 100% lines / 100% branches (umbral: ≥90%/85%) ✅
+    [x] CustodyNotificationService: 100% lines / 100% branches (umbral: ≥80%/75%) ✅
+[x] ADR-017: CustodyNotificationService FCM+SMS+CircuitBreaker (módulo separado del UBER_BASE)
+[x] TypeScript: 0 errores
+```
+
 ### Sprint 6 SistemaCustodias — módulo alerts ✅ COMPLETO (2026-05-14)
 ```
 [x] ALERTS-001: módulo alerts completo

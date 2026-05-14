@@ -3,9 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import type { Knex } from 'knex';
+import type { Queue } from 'bullmq';
 import { BusinessError } from '../../shared/errors/business-error.js';
 import type { AlertsRepository } from './alerts.repository.js';
 import type { CustodyOrdersService } from '../custody-orders/custody-orders.service.js';
+import type { CustodyNotificationJobData } from '../custody-notifications/custody-notifications.types.js';
 import type {
   SecurityAlert,
   AlertType,
@@ -44,6 +46,7 @@ export class AlertEngine {
     private readonly repo: AlertsRepository,
     private readonly db: Knex,
     private readonly ordersService: CustodyOrdersService,
+    private readonly notificationsQueue?: Queue<CustodyNotificationJobData>,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -152,6 +155,33 @@ export class AlertEngine {
         );
       } catch {
         // reportIncident may fail if already in INCIDENT — treat as non-fatal
+      }
+    }
+
+    // 6. Enqueue notification for panic/critical alerts (non-fatal side effect)
+    if (this.notificationsQueue && (payload.alert_type === 'panic' || SEVERITY_MAP[payload.alert_type] === 'high')) {
+      try {
+        // Get tenant_id from the order
+        const orderRow = await this.db.raw<{ rows: Array<{ tenant_id: string | null }> }>(
+          `SELECT c.tenant_id FROM custody_orders co
+           LEFT JOIN clients cl ON co.client_id = cl.id
+           LEFT JOIN companies c ON cl.company_id = c.id
+           WHERE co.id = ? LIMIT 1`,
+          [payload.order_id],
+        );
+        const tenantId = orderRow.rows[0]?.tenant_id ?? 'default';
+        await this.notificationsQueue.add('notification', {
+          type: 'alert',
+          payload: {
+            alert_id: alert.id,
+            order_id: payload.order_id,
+            alert_type: payload.alert_type,
+            severity: SEVERITY_MAP[payload.alert_type],
+            tenant_id: tenantId,
+          },
+        });
+      } catch {
+        // Notification enqueue failure is non-fatal
       }
     }
 

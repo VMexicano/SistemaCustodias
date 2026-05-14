@@ -1,23 +1,38 @@
-# Snapshot: notifications
-> FCM push + SMS fallback + circuit breaker.
-> Última actualización: 2026-05-13 — Sprint 0
+# Snapshot: custody-notifications
+> FCM push + SMS fallback + CircuitBreaker Redis — módulo custody separado del UBER_BASE.
+> Última actualización: 2026-05-14 — Sprint 7 ✅ COMPLETO
+
+---
+
+## Estado de cobertura — Sprint 7
+
+| Archivo | Lines | Branches | Funciones |
+|---|---|---|---|
+| `circuit-breaker.ts` | **100%** | **100%** | **100%** |
+| `custody-notifications.service.ts` | **100%** | **100%** | **100%** |
+
+Umbrales requeridos: circuit-breaker ≥ 90%/85%, service ≥ 80%/75% → **APROBADO**
+
+Tests: 44 tests, 44 pasando · Suites: 2/2
 
 ---
 
 ## Archivo(s) principal(es)
 
 ```
-apps/api/src/modules/notifications/
-  notifications.routes.ts
-  notifications.controller.ts
-  notifications.service.ts
-  notifications.repository.ts
-  notification-worker.ts    (BullMQ worker)
-  fcm.client.ts
-  sms.client.ts
-  circuit-breaker.ts
-  notifications.types.ts
+apps/api/src/modules/custody-notifications/   ← módulo separado (ADR-014, ADR-017)
+  custody-notifications.types.ts
+  custody-notifications.repository.ts
+  custody-notifications.service.ts
+  sms.client.ts           (ISmsClient + LogSmsClient MVP)
+  circuit-breaker.ts      (CircuitBreaker Redis)
+
+apps/api/src/queues/custody-notifications.queue.ts
+apps/api/src/workers/custody-notification-worker.ts
+apps/api/migrations/20260514_052_create_notifications_table.ts
 ```
+
+**NOTA:** El módulo `apps/api/src/modules/notifications/` pertenece al UBER_BASE (viajes/pagos). NO modificar.
 
 ---
 

@@ -1,12 +1,37 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { Queue } from 'bullmq';
 import type { CustodyOrdersService } from './custody-orders.service.js';
 import type { OrderStatus } from './custody-orders.types.js';
+import type { CustodyNotificationJobData } from '../custody-notifications/custody-notifications.types.js';
 
 export class CustodyOrdersController {
-  constructor(private readonly service: CustodyOrdersService) {}
+  constructor(
+    private readonly service: CustodyOrdersService,
+    private readonly notificationsQueue?: Queue<CustodyNotificationJobData>,
+  ) {}
 
   private actor(request: FastifyRequest) {
     return { userId: request.user!.sub, role: request.user!.roles[0] ?? 'unknown' };
+  }
+
+  private enqueueTransitionNotification(
+    request: FastifyRequest,
+    result: { id: string; status: string; clientId?: string | null; custodioId?: string | null; copilotoId?: string | null },
+  ): void {
+    if (!this.notificationsQueue) return;
+    this.notificationsQueue
+      .add('notification', {
+        type: 'order-transition',
+        payload: {
+          order_id: result.id,
+          to_status: result.status,
+          client_id: result.clientId ?? null,
+          custodio_id: result.custodioId ?? null,
+          copiloto_id: result.copilotoId ?? null,
+          tenant_id: request.user!.tenant_id ?? 'default',
+        },
+      })
+      .catch(() => { /* non-fatal */ });
   }
 
   async create(request: FastifyRequest, reply: FastifyReply) {
@@ -57,19 +82,25 @@ export class CustodyOrdersController {
 
   async submit(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
-    return reply.send(await this.service.submit(id, this.actor(request)));
+    const result = await this.service.submit(id, this.actor(request));
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async approve(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const body = request.body as { notes?: string } | undefined;
-    return reply.send(await this.service.approve(id, this.actor(request), { notes: body?.notes }));
+    const result = await this.service.approve(id, this.actor(request), { notes: body?.notes });
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async reject(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const { reason } = request.body as { reason: string };
-    return reply.send(await this.service.reject(id, this.actor(request), reason));
+    const result = await this.service.reject(id, this.actor(request), reason);
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async cancel(request: FastifyRequest, reply: FastifyReply) {
@@ -81,62 +112,84 @@ export class CustodyOrdersController {
   async assign(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const { custodioId, copilotoId } = request.body as { custodioId: string; copilotoId: string };
-    return reply.send(await this.service.assignCrew(id, this.actor(request), custodioId, copilotoId));
+    const result = await this.service.assignCrew(id, this.actor(request), custodioId, copilotoId);
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async confirmCrew(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
-    return reply.send(await this.service.confirmCrew(id, this.actor(request)));
+    const result = await this.service.confirmCrew(id, this.actor(request));
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async reassign(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const { custodioId, copilotoId } = request.body as { custodioId: string; copilotoId: string };
-    return reply.send(await this.service.reassignCrew(id, this.actor(request), custodioId, copilotoId));
+    const result = await this.service.reassignCrew(id, this.actor(request), custodioId, copilotoId);
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async depart(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
-    return reply.send(await this.service.depart(id, this.actor(request)));
+    const result = await this.service.depart(id, this.actor(request));
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async arrivePickup(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
-    return reply.send(await this.service.arrivePickup(id, this.actor(request)));
+    const result = await this.service.arrivePickup(id, this.actor(request));
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async pickup(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const { digitalSignature } = request.body as { digitalSignature: string };
-    return reply.send(await this.service.pickup(id, this.actor(request), digitalSignature));
+    const result = await this.service.pickup(id, this.actor(request), digitalSignature);
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async arriveDelivery(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
-    return reply.send(await this.service.arriveDelivery(id, this.actor(request)));
+    const result = await this.service.arriveDelivery(id, this.actor(request));
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async deliver(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const { digitalSignature } = request.body as { digitalSignature: string };
-    return reply.send(await this.service.deliver(id, this.actor(request), digitalSignature));
+    const result = await this.service.deliver(id, this.actor(request), digitalSignature);
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async complete(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
-    return reply.send(await this.service.complete(id, this.actor(request)));
+    const result = await this.service.complete(id, this.actor(request));
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async reportIncident(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const { description } = request.body as { description: string };
-    return reply.send(await this.service.reportIncident(id, this.actor(request), description));
+    const result = await this.service.reportIncident(id, this.actor(request), description);
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async resolveIncident(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
     const { transitTo, notes } = request.body as { transitTo: 'IN_TRANSIT' | 'RESOLVED'; notes?: string };
-    return reply.send(await this.service.resolveIncident(id, this.actor(request), transitTo, { notes }));
+    const result = await this.service.resolveIncident(id, this.actor(request), transitTo, { notes });
+    this.enqueueTransitionNotification(request, result);
+    return reply.send(result);
   }
 
   async pickupFailed(request: FastifyRequest, reply: FastifyReply) {
