@@ -8,107 +8,71 @@
 
 ## Estado actual
 
-**Sprint:** 1 en curso — Schema BD ✅ Auth extendido ✅ TenantMiddleware ✅
+**Sprint:** 2 COMPLETO — clients ✅ operadores ✅ vehicles ✅
 **Fecha último cierre:** 2026-05-14
-**Tipo de tarea próxima:** [ORDERS] / [CLIENTS] — Sprint 2
+**Tipo de tarea próxima:** [ORDERS] — Sprint 3 — CustodyStateMachine
 
 ---
 
-## Logros de esta sesión (2026-05-13 → 2026-05-14)
+## Logros de Sprint 2 (2026-05-14)
 
-### INFRA-000 — Entorno Docker ✅
-- [x] `docker-compose.yml` renombrado `ridebase_*` → `custodias_*`
-- [x] `apps/api/.env` creado con credenciales correctas para dominio custodia
-- [x] 6 contenedores corriendo: `custodias_postgres` (5432), `custodias_redis` (6379), `custodias_bull_board` (3001), `custodias_grafana` (3000), `custodias_prometheus` (9090), `custodias_jaeger` (16686)
+### CLIENTS-001 — Módulo clients ✅
+- [x] `POST /clients` — dispatcher/supervisor crea cliente con tenant_id del JWT
+- [x] `GET /clients/me` — cliente autenticado lee su propio perfil
+- [x] `GET /clients` — listado paginado filtrado por tenant
+- [x] `GET /clients/:id`, `PATCH /clients/:id`, `DELETE /clients/:id`
+- [x] Soft delete con deleted_at
+- [x] 10 tests unitarios ✅
 
-### INFRA-001 — Migraciones M-39→M-51 ✅
-- [x] 13 migraciones creadas y aplicadas (51 totales en BD)
-- [x] `custody_types`, `clients`, `custody_vehicles`, `operators`
-- [x] `custody_orders` (17 estados CHECK + constraint crew_different)
-- [x] `value_declarations`, `order_transitions` (INSERT-ONLY), `security_alerts`
-- [x] `location_readings` — hypertable TimescaleDB ✅
-- [x] `pricing_rules`, `custody_payments`
-- [x] `companies.tenant_id` ALTER
-- [x] `user_roles` CHECK con 8 roles válidos
+### OPERADORES-001 — Módulo operadores ✅
+- [x] `GET /operadores/available` — operadores con status='available' filtrados por tenant + tipo
+- [x] `POST /operadores` — supervisor crea operador (custodio/copiloto)
+- [x] `GET /operadores`, `GET /operadores/:id`
+- [x] `PATCH /operadores/:id/status` — cambiar available/busy/offline
+- [x] `PATCH /operadores/:id/suspend` — supervisor suspende (valida no estar en orden activa)
+- [x] `DELETE /operadores/:id` — soft delete
+- [x] 13 tests unitarios ✅
 
-### INFRA-002 — Seed custody_types ✅
-- [x] 4 tipos con JSON Schema completo: `cash_transport`, `high_value_package`, `confidential_docs`, `vip_escort`
-- [x] Seed idempotente (ON CONFLICT DO NOTHING)
+### VEHICLES-001 — Módulo vehicles ✅
+- [x] `POST /vehicles` — supervisor crea vehículo blindado
+- [x] `GET /vehicles`, `GET /vehicles/:id`
+- [x] `PATCH /vehicles/:id` — actualizar datos
+- [x] `PATCH /vehicles/:id/assign/:operatorId` — vincula vehículo a operador
+- [x] `DELETE /vehicles/:id` — soft delete (active=false)
+- [x] 11 tests unitarios ✅
 
-### AUTH-001 — JWT extendido ✅
-- [x] `JWTService`: `tenant_id?: string` en `AccessTokenPayload` y `VerifiedToken`
-- [x] `authenticate.ts`: `JWTPayload` con `tenant_id?`
-- [x] `AuthService.register()`: acepta `role: UserRole` (5 roles custodia + 3 legacy)
-- [x] `AuthService.verifyPhone/refresh()`: resuelven `tenant_id` desde `company_users`
-- [x] `UserRole` type exportado: `client | custodio | copiloto | dispatcher | supervisor | passenger | driver | admin`
-
-### AUTH-002 — TenantMiddleware ✅
-- [x] `tenant.middleware.ts`: `tenantGuard` preHandler protege `/custody`, `/orders`, `/clients`, `/operators`
-- [x] Error `TENANT_REQUIRED` (403) agregado al catálogo `business-error.ts`
-
-### Tests y calidad ✅
-- [x] 36/36 tests unitarios pasando (auth.service + tenant.middleware)
-- [x] TypeScript 0 errores
-- [x] 6 tests nuevos para roles de custodia + tenant_id en JWT
+### Calidad ✅
+- [x] TypeScript: 0 errores
+- [x] Tests: 577/577 pasando (34 suites)
+- [x] Nuevos errores de negocio: CLIENT_NOT_FOUND, CLIENT_ALREADY_EXISTS, OPERATOR_NOT_FOUND, OPERATOR_ALREADY_EXISTS, OPERATOR_SUSPENDED, OPERATOR_ON_ACTIVE_ORDER, INVALID_OPERATOR_TYPE, VEHICLE_NOT_FOUND, PLATE_ALREADY_EXISTS
 
 ---
 
-## Decisiones técnicas tomadas esta sesión
+## Próxima sesión — Sprint 3
 
-| Decisión | Resultado |
-|---|---|
-| Naming tabla vehicles | `custody_vehicles` (no `vehicles`) — evita colisión con M-008 ride-hailing |
-| tenant_id en JWT | Opcional (`?`) — null si usuario sin empresa asignada |
-| TenantMiddleware scope | Solo valida presencia; cross-tenant validation en S9 con RLS |
-| M-50 companies | Self-referential `tenant_id` para jerarquía futura; nullable en MVP |
-| Docker naming | `custodias_*` en todos los contenedores/volúmenes/red |
+**Objetivo:** Módulo `custody-orders` — CustodyStateMachine + flujo completo de orden
 
----
-
-## Próxima sesión — Sprint 2
-
-**Objetivo:** Módulos `clients` + `operadores` — CRUD + disponibilidad de operadores
+**Alcance Sprint 3:**
+- State machine con SELECT FOR UPDATE
+- POST /orders — crear orden (DRAFT → PENDING_APPROVAL)
+- PATCH /orders/:id/approve — supervisor aprueba
+- PATCH /orders/:id/assign-crew — dispatcher asigna custodio + copiloto
+- PATCH /orders/:id/confirm-crew — custodio/copiloto confirman (regla dos-personas)
+- Transiciones hasta IN_TRANSIT
+- custody_snapshot generado al entrar a IN_TRANSIT
+- pricing_snapshot generado al entrar a APPROVED
+- Tests: CustodyStateMachine 100% cobertura
 
 **Cargar en contexto:**
-- `context/project-index.md` (siempre)
-- `context/snapshots/clients.snapshot.md`
-- `context/snapshots/operadores.snapshot.md`
-- `steering/coding-standards.md`
-
-**Tareas planificadas:**
-```
-NUEVO   src/modules/clients/        (routes + controller + service + repository)
-NUEVO   src/modules/operadores/     (routes + controller + service + repository)
-NUEVO   src/modules/vehicles/       (CRUD simple)
-NUEVO   src/__tests__/clients/
-NUEVO   src/__tests__/operadores/
-```
+- `context/project-index.md`
+- `context/snapshots/custody-orders.snapshot.md`
+- `steering/testing-standards.md`
 
 ---
 
 ## Ambiente actual
 
 - Docker: ✅ 6 servicios corriendo
-- BD: ✅ 51 migraciones aplicadas + 12 seeds
+- BD: ✅ 51 migraciones aplicadas
 - TypeScript: ✅ 0 errores
-- Tests: ✅ 36/36 unitarios (auth + middleware)
-- Commit: ⬜ Pendiente (usuario interrumpió git add para documentar primero)
-
----
-
-## Archivos clave creados/modificados esta sesión
-
-| Archivo | Propósito |
-|---|---|
-| `docker-compose.yml` | Renombrado a custodias_* |
-| `apps/api/.env` | Credenciales de desarrollo |
-| `migrations/20260513_039_*` a `_051_*` | 13 migraciones dominio custodia |
-| `seeds/12_custody_types.ts` | 4 tipos con JSON Schema |
-| `src/modules/auth/auth.service.ts` | Register con role, tenant_id en tokens |
-| `src/modules/auth/jwt.service.ts` | tenant_id en payload |
-| `src/shared/middleware/authenticate.ts` | tenant_id en JWTPayload |
-| `src/shared/middleware/tenant.middleware.ts` | Nuevo: TenantMiddleware |
-| `src/shared/errors/business-error.ts` | TENANT_REQUIRED agregado |
-| `src/__tests__/auth/auth.service.test.ts` | 8 tests nuevos |
-| `src/__tests__/middleware/tenant.middleware.test.ts` | Nuevo: 8 tests |
-| `context/snapshots/infra.snapshot.md` | Actualizado con Docker info |
+- Tests: ✅ 577/577 (34 suites)

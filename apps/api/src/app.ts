@@ -81,6 +81,15 @@ import { custodyRoutes } from './modules/custody/custody.routes.js';
 import { TemperatureRepository } from './modules/temperature/temperature.repository.js';
 import { TemperatureService } from './modules/temperature/temperature.service.js';
 import { temperatureRoutes } from './modules/temperature/temperature.routes.js';
+import { ClientsRepository } from './modules/clients/clients.repository.js';
+import { ClientsService } from './modules/clients/clients.service.js';
+import { clientsRoutes } from './modules/clients/clients.routes.js';
+import { OperadoresRepository } from './modules/operadores/operadores.repository.js';
+import { OperadoresService } from './modules/operadores/operadores.service.js';
+import { operadoresRoutes } from './modules/operadores/operadores.routes.js';
+import { VehiclesRepository as CustodyVehiclesRepository } from './modules/vehicles/vehicles.repository.js';
+import { VehiclesService as CustodyVehiclesService } from './modules/vehicles/vehicles.service.js';
+import { vehiclesRoutes } from './modules/vehicles/vehicles.routes.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -376,6 +385,30 @@ export async function buildApp() {
   const temperatureRepo = new TemperatureRepository(db);
   const temperatureService = new TemperatureService(temperatureRepo, tripsRepo, driversRepo);
   await app.register(temperatureRoutes, { prefix: '/trips', temperatureService });
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — clients module (Sprint 2)
+  // ---------------------------------------------------------------------------
+
+  const clientsRepo = new ClientsRepository(db);
+  const clientsService = new ClientsService(clientsRepo);
+  await app.register(clientsRoutes, { prefix: '/clients', clientsService });
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — operadores module (Sprint 2)
+  // ---------------------------------------------------------------------------
+
+  const operadoresRepo = new OperadoresRepository(db);
+  const operadoresService = new OperadoresService(operadoresRepo);
+  await app.register(operadoresRoutes, { prefix: '/operadores', operadoresService });
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — custody vehicles module (Sprint 2)
+  // ---------------------------------------------------------------------------
+
+  const custodyVehiclesRepo = new CustodyVehiclesRepository(db);
+  const custodyVehiclesService = new CustodyVehiclesService(custodyVehiclesRepo, operadoresRepo);
+  await app.register(vehiclesRoutes, { prefix: '/vehicles', vehiclesService: custodyVehiclesService });
 
   // ---------------------------------------------------------------------------
   // Health check endpoint

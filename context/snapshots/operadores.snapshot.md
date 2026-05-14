@@ -1,6 +1,6 @@
 # Snapshot: operadores
 > Custodios y copilotos — onboarding, documentos, disponibilidad, asignación.
-> Última actualización: 2026-05-13 — Sprint 0
+> Última actualización: 2026-05-14 — Sprint 2 ✅
 
 ---
 
@@ -110,10 +110,28 @@ interface Operator {
 
 ---
 
+## Endpoints implementados (Sprint 2)
+
+| Método | Ruta | Roles | Descripción |
+|---|---|---|---|
+| GET | `/operadores/available` | dispatcher, supervisor | Operadores con status='available' (filtro: operator_type) |
+| POST | `/operadores` | supervisor | Crear operador |
+| GET | `/operadores` | dispatcher, supervisor | Listar operadores del tenant (filtros: operator_type, status) |
+| GET | `/operadores/:id` | dispatcher, supervisor | Ver operador por ID |
+| PATCH | `/operadores/:id/status` | dispatcher, supervisor | Cambiar status (available/busy/offline) |
+| PATCH | `/operadores/:id/suspend` | supervisor | Suspender operador |
+| DELETE | `/operadores/:id` | supervisor | Soft delete |
+
+## Cobertura (Sprint 2)
+
+| Archivo | Tests | Cobertura |
+|---|---|---|
+| operadores.service.ts | 13 tests unitarios | ≥ 80% |
+
 ## Dependencias entre módulos
 
 - `auth` — Todo operador es primero un `user` con role custodio/copiloto
-- `custody-orders` — Las órdenes referencian `custodio_id` y `copiloto_id`
-- `tracking` — Las lecturas GPS incluyen `operator_id`
-- `alerts` — Las alertas de pánico se originan desde un operador
-- `vehicles` — Cada operador tiene un vehículo asignado
+- `vehicles` — `operators.vehicle_id` FK→custody_vehicles ← asignado desde PATCH /vehicles/:id/assign/:operatorId
+- `custody-orders` — Las órdenes referencian `custodio_id` y `copiloto_id` (Sprint 4)
+- `tracking` — Las lecturas GPS incluyen `operator_id` (Sprint 7)
+- `alerts` — Las alertas de pánico se originan desde un operador (Sprint 8)

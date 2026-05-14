@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 1 completado. Schema BD + Auth + TenantMiddleware activos.
+> Última actualización: 2026-05-14 — Sprint 2 completado. Módulos clients + operadores + vehicles activos.
 
 ---
 
@@ -54,8 +54,8 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | # | Módulo | Estado | Descripción |
 |---|---|---|---|
 | 01 | `auth` | ✅ Sprint 1 | OTP, JWT con `tenant_id` + `role`, 5 roles custodia, TenantMiddleware |
-| 02 | `clients` | ⬜ Pendiente | Gestión de clientes (empresa/persona) |
-| 03 | `operadores` | ⬜ Pendiente | Custodios y copilotos — onboarding, documentos, disponibilidad |
+| 02 | `clients` | ✅ Sprint 2 | CRUD clientes — POST/GET/PATCH/DELETE + GET /me |
+| 03 | `operadores` | ✅ Sprint 2 | CRUD operadores — disponibilidad, suspensión, estado |
 | 04 | `custody-orders` | ⬜ Pendiente | State machine completo de la orden de custodia |
 | 05 | `value-declaration` | ⬜ Pendiente | Declaración de valores — schema dinámico por tipo |
 | 06 | `routing` | ⬜ Pendiente | Planeación y validación de rutas seguras |
