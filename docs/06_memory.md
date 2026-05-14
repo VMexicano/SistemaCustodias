@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-14 — Sprint 1 SistemaCustodias: Schema BD completo (M-39→M-51) + Auth extendido (5 roles custodia, tenant_id en JWT) + TenantMiddleware. 51 migraciones totales en BD. Docker renombrado custodias_*.
+> **Última actualización:** 2026-05-14 — Sprint 4 SistemaCustodias: value-declaration backend (Ajv JSONB schema, POST/GET /orders/:id/value-declaration, GET /custody-types) + CustodyClientStack mobile (3 pantallas: SelectCustodyType → NewCustodyOrder → ValueDeclaration) + 22 nuevos tests.
 
 ---
 
@@ -37,19 +37,40 @@
 
 ## Próximas Tareas — Orden Recomendado
 
-### Sprint 1 SistemaCustodias — Schema BD + Auth + TenantMiddleware ✅ COMPLETO (2026-05-14)
+### Sprint 4 SistemaCustodias — value-declaration + CustodyClientStack ✅ COMPLETO (2026-05-14)
+```
+[x] VALUEDECL-001: ValueDeclarationRepository (findCustodyType, listActiveCustodyTypes, findByOrderId, upsert)
+[x] VALUEDECL-001: ValueDeclarationService (Ajv JSON Schema validation, DECLARABLE_STATUSES, SELECT FOR UPDATE)
+[x] VALUEDECL-001: POST /orders/:id/value-declaration — upsert con validación dinámica
+[x] VALUEDECL-001: GET /orders/:id/value-declaration — consulta declaración
+[x] VALUEDECL-001: GET /custody-types — lista tipos activos con schemas
+[x] VALUEDECL-001: Seed 13 — client (+525500000099) + supervisor (+525500000098) usuarios test
+[x] VALUEDECL-001: E2E smoke test (custody-order-flow.spec.ts) — create → declare → submit → PENDING_APPROVAL
+[x] MOBILE-001: custody.store.ts — Zustand con NewOrderDraft + setDraft + clearDraft
+[x] MOBILE-001: SelectCustodyTypeScreen — fetches /custody-types, FlatList con testIDs
+[x] MOBILE-001: NewCustodyOrderScreen — formulario pickup + delivery addresses
+[x] MOBILE-001: ValueDeclarationScreen — form dinámico desde JSON Schema, POST + PATCH submit
+[x] MOBILE-001: CustodyClientStack — Stack navigator 3 pantallas
+[x] MOBILE-001: RootNavigator rutea role='client' → CustodyClientStack
+[x] MOBILE-001: auth.store.ts extendido con 'client' | 'custodio' | 'copiloto'
+[x] Tests nuevos: 22/22 (11 service + 3 SelectCustodyType + 5 ValueDeclaration + 3 E2E smoke) ✅
+[x] TypeScript: 0 errores ✅
+```
+
+### Sprint 1–3 SistemaCustodias ✅ COMPLETO (2026-05-14)
 ```
 [x] INFRA-000: Docker renombrado a custodias_* (6 servicios activos)
 [x] INFRA-001: 13 migraciones M-39→M-51 (custody_types, clients, custody_vehicles, operators,
               custody_orders, value_declarations, order_transitions, security_alerts,
               location_readings hypertable, pricing_rules, custody_payments,
               ALTER companies + user_roles CHECK)
-[x] INFRA-002: Seed 12_custody_types — 4 tipos con JSON Schema (cash_transport, high_value_package,
-              confidential_docs, vip_escort)
-[x] AUTH-001: JWT extendido — tenant_id en payload, 5 roles custodia en AuthService.register()
-[x] AUTH-002: TenantMiddleware — 403 TENANT_REQUIRED en /custody, /orders, /clients, /operators
-[x] Tests: 36/36 ✅ · TypeScript: 0 errores ✅
-Pendiente: commit git
+[x] INFRA-002: Seed 12_custody_types — 4 tipos con JSON Schema
+[x] AUTH-001: JWT extendido — tenant_id en payload, 5 roles custodia
+[x] AUTH-002: TenantMiddleware — 403 TENANT_REQUIRED en rutas custodia
+[x] CLIENTS-001: CRUD clientes (POST/GET/PATCH/DELETE /clients + GET /clients/me)
+[x] OPERATORS-001: CRUD operadores (disponibilidad, suspensión, estado)
+[x] ORDERS-001: CustodyStateMachine 18 estados + 20 endpoints + audit log + snapshots
+[x] Tests: 127/127 unit tests ✅ · TypeScript: 0 errores ✅
 ```
 
 ### Sprint 1 — Fundamentos UBER_BASE ✅ COMPLETO (2026-04-05)

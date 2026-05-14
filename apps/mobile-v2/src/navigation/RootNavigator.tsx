@@ -5,6 +5,7 @@ import { useVerticalStore } from '../stores/vertical.store';
 import LoginScreen from '../screens/auth/LoginScreen';
 import PassengerStack from './PassengerStack';
 import DriverStack from './DriverStack';
+import CustodyClientStack from './CustodyClientStack';
 import { RootStackParamList } from './types';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -28,6 +29,14 @@ export default function RootNavigator(): React.JSX.Element {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="PassengerStack" component={PassengerStack} />
+      </Stack.Navigator>
+    );
+  }
+
+  if (role === 'client') {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="CustodyClientStack" component={CustodyClientStack} />
       </Stack.Navigator>
     );
   }

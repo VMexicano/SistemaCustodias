@@ -93,6 +93,10 @@ import { vehiclesRoutes } from './modules/vehicles/vehicles.routes.js';
 import { CustodyOrdersRepository } from './modules/custody-orders/custody-orders.repository.js';
 import { CustodyOrdersService } from './modules/custody-orders/custody-orders.service.js';
 import { ordersRoutes } from './modules/custody-orders/custody-orders.routes.js';
+import { ValueDeclarationRepository } from './modules/value-declaration/value-declaration.repository.js';
+import { ValueDeclarationService } from './modules/value-declaration/value-declaration.service.js';
+import { valueDeclarationRoutes } from './modules/value-declaration/value-declaration.routes.js';
+import { custodyTypesRoutes } from './modules/custody-types/custody-types.routes.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -420,6 +424,18 @@ export async function buildApp() {
   const custodyOrdersRepo = new CustodyOrdersRepository(db);
   const custodyOrdersService = new CustodyOrdersService(custodyOrdersRepo, db);
   await app.register(ordersRoutes, { prefix: '/orders', ordersService: custodyOrdersService });
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — value-declaration module (Sprint 4)
+  // ---------------------------------------------------------------------------
+
+  const valueDeclarationRepo = new ValueDeclarationRepository(db);
+  const valueDeclarationService = new ValueDeclarationService(valueDeclarationRepo, db);
+  await app.register(custodyTypesRoutes, { prefix: '/custody-types', valueDeclarationService });
+  await app.register(valueDeclarationRoutes, {
+    prefix: '/orders/:id/value-declaration',
+    valueDeclarationService,
+  });
 
   // ---------------------------------------------------------------------------
   // Health check endpoint

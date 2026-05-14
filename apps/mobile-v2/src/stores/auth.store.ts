@@ -10,7 +10,7 @@ const mmkvStorage = {
   removeItem: (name: string): void => storage.delete(name),
 };
 
-export type UserRole = 'passenger' | 'driver';
+export type UserRole = 'passenger' | 'driver' | 'client' | 'custodio' | 'copiloto';
 
 interface AuthState {
   accessToken: string | null;

@@ -88,7 +88,10 @@ export type BusinessErrorCode =
   | 'INVALID_OPERATOR_TYPE'
   // Vehicles
   | 'VEHICLE_NOT_FOUND'
-  | 'PLATE_ALREADY_EXISTS';
+  | 'PLATE_ALREADY_EXISTS'
+  // Value declarations
+  | 'VALUE_DECLARATION_NOT_FOUND'
+  | 'CUSTODY_TYPE_NOT_FOUND';
 
 const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   PASSENGER_HAS_ACTIVE_TRIP: 409,
@@ -160,6 +163,8 @@ const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   INVALID_OPERATOR_TYPE: 400,
   VEHICLE_NOT_FOUND: 404,
   PLATE_ALREADY_EXISTS: 409,
+  VALUE_DECLARATION_NOT_FOUND: 404,
+  CUSTODY_TYPE_NOT_FOUND: 404,
 };
 
 export class BusinessError extends Error {

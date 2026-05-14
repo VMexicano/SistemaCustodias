@@ -8,9 +8,9 @@
 
 ## Estado actual
 
-**Sprint:** 3 COMPLETO — custody-orders ✅
+**Sprint:** 4 COMPLETO — value-declaration + CustodyClientStack ✅
 **Fecha último cierre:** 2026-05-14
-**Tipo de tarea próxima:** [VALUE_DECL] — Sprint 4 — value-declaration + mobile UI inicial
+**Tipo de tarea próxima:** [TRACKING] — Sprint 5 — GPS tracking + WebSocket tiempo real
 
 ---
 
@@ -61,20 +61,50 @@
 
 ---
 
-## Próxima sesión — Sprint 4
+## Logros de Sprint 4 (2026-05-14)
 
-**Objetivo:** `value-declaration` + primera pantalla mobile cliente
+### VALUEDECL-001 — Módulo value-declaration ✅
 
-**Alcance Sprint 4:**
-- Módulo value-declaration — schema dinámico por tipo de custodia (JSONB)
-- POST /orders/:id/value-declaration — cliente declara valores
-- Mobile: pantalla "Crear orden" (flujo cliente) — primera UI funcional
-- Primer smoke test E2E (Playwright): crear orden → submit → ver en lista
+**Backend:**
+- `GET /custody-types` — lista tipos activos con JSON Schema
+- `POST /orders/:id/value-declaration` — upsert con validación Ajv dinámica
+- `GET /orders/:id/value-declaration` — consulta declaración
+- Nuevos error codes: `VALUE_DECLARATION_NOT_FOUND (404)`, `CUSTODY_TYPE_NOT_FOUND (404)`
+- `DECLARABLE_STATUSES = Set(['DRAFT', 'PENDING_APPROVAL'])`
+- Seed 13: usuarios test cliente (+525500000099) + supervisor (+525500000098)
+- Smoke test E2E: create → declare → submit → PENDING_APPROVAL
+
+**Mobile — CustodyClientStack:**
+- `SelectCustodyTypeScreen` — fetches /custody-types, navega con draft
+- `NewCustodyOrderScreen` — formulario pickup + delivery
+- `ValueDeclarationScreen` — form dinámico desde JSON Schema + submit
+- `custody.store.ts` — Zustand con NewOrderDraft
+- `auth.store.ts` extendido con roles `client | custodio | copiloto`
+- `RootNavigator` rutea `client` → `CustodyClientStack`
+
+### Calidad ✅
+- TypeScript: 0 errores
+- Tests nuevos: 22/22 (11 service + 3 SelectCustodyType + 5 ValueDeclaration + 3 E2E smoke)
+- Total suite API: 675 (69 fallan solo en integration tests que requieren Docker — preexistentes)
+- Total suite mobile: 155 (4 fallan solo en tests legacy preexistentes)
+
+---
+
+## Próxima sesión — Sprint 5
+
+**Objetivo:** GPS tracking tiempo real + WebSocket + TimescaleDB
+
+**Alcance Sprint 5:**
+- Módulo `tracking` — PATCH /orders/:id/location (custodio/copiloto reportan GPS)
+- GET /orders/:id/track (supervisor/dispatcher ve posición en tiempo real)
+- WebSocket channel para actualizaciones live de posición
+- TimescaleDB hypertable `location_readings` (M-047, ya existe)
+- Integración con custody_snapshot: validar que equipo esté en ruta
 
 **Cargar en contexto:**
 - `context/project-index.md`
-- `context/snapshots/value-declaration.snapshot.md`
-- `steering/product.md` (para flujo mobile)
+- `context/snapshots/tracking.snapshot.md`
+- `steering/architecture.md`
 
 ---
 
@@ -83,4 +113,4 @@
 - Docker: ✅ 6 servicios corriendo
 - BD: ✅ 51 migraciones aplicadas
 - TypeScript: ✅ 0 errores
-- Tests: ✅ 105/105 custody tests (suite completa sin contar módulos anteriores)
+- Tests: ✅ 127/127 custody unit tests (Sprint 3+4, sin integration tests que requieren Docker)

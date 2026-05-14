@@ -45,8 +45,15 @@ export type DriverStackParamList = {
   };
 };
 
+export type CustodyClientStackParamList = {
+  SelectCustodyType: undefined;
+  NewCustodyOrder: undefined;
+  ValueDeclaration: { orderId: string };
+};
+
 export type RootStackParamList = {
   Login: undefined;
   PassengerStack: undefined;
   DriverStack: undefined;
+  CustodyClientStack: undefined;
 };
