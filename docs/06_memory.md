@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-07 — Sprint 17 completo: flujo aprobación multi-vertical (ADR-047). PENDING_APPROVAL + APPROVED + actor dispatcher. Migration 038 + seed 11. Backoffice AprobacionesPage. Mobile banners. Bug fix: dispatcher actorId=null por FK admin_users vs users.
+> **Última actualización:** 2026-05-14 — Sprint 1 SistemaCustodias: Schema BD completo (M-39→M-51) + Auth extendido (5 roles custodia, tenant_id en JWT) + TenantMiddleware. 51 migraciones totales en BD. Docker renombrado custodias_*.
 
 ---
 
@@ -11,11 +11,11 @@
 | Módulo | Estado | Notas |
 |---|---|---|
 | Arquitectura | ✅ Definida | Monolito modular, stack completo |
-| Schema BD | ✅ Definido | Pendiente implementación de migraciones |
+| Schema BD | ✅ Completo | 51 migraciones aplicadas (M-01→M-51). Todas tablas custodia creadas. |
 | **Sistema de agentes** | ✅ Completo | 7 agentes + orchestrator 4 fases + handoff protocol + /team skill |
 | **Skills (.claude/skills/)** | ✅ Completo | 10 skills: 4 especialización + 6 operacionales. Vinculadas a los 7 agentes. |
 | **Commands (.claude/commands/)** | ✅ Completo | 7 commands: session-start/end, status, module, plan, team, agent |
-| Auth | ✅ Completo | Sprint 2: OTP-only, JWT híbrido PostgreSQL+Redis, 8 endpoints, 48 unit tests |
+| Auth (custodia) | ✅ Sprint 1 | 5 roles custodia, `tenant_id` en JWT, TenantMiddleware, 36 unit tests |
 | Users | ✅ Completo | Sprint 2: GET/PATCH /users/me, Stripe SetupIntent, audit_logs |
 | Drivers | ✅ Completo | Sprint 3: 11 endpoints, service_modes multi-vertical, admin doc review, 114 tests |
 | Trips | ✅ Completo | Sprint 17: approval flow (ADR-047), 12 endpoints, 60 SM tests, actor dispatcher |
@@ -37,7 +37,22 @@
 
 ## Próximas Tareas — Orden Recomendado
 
-### Sprint 1 — Fundamentos ✅ COMPLETO (2026-04-05)
+### Sprint 1 SistemaCustodias — Schema BD + Auth + TenantMiddleware ✅ COMPLETO (2026-05-14)
+```
+[x] INFRA-000: Docker renombrado a custodias_* (6 servicios activos)
+[x] INFRA-001: 13 migraciones M-39→M-51 (custody_types, clients, custody_vehicles, operators,
+              custody_orders, value_declarations, order_transitions, security_alerts,
+              location_readings hypertable, pricing_rules, custody_payments,
+              ALTER companies + user_roles CHECK)
+[x] INFRA-002: Seed 12_custody_types — 4 tipos con JSON Schema (cash_transport, high_value_package,
+              confidential_docs, vip_escort)
+[x] AUTH-001: JWT extendido — tenant_id en payload, 5 roles custodia en AuthService.register()
+[x] AUTH-002: TenantMiddleware — 403 TENANT_REQUIRED en /custody, /orders, /clients, /operators
+[x] Tests: 36/36 ✅ · TypeScript: 0 errores ✅
+Pendiente: commit git
+```
+
+### Sprint 1 — Fundamentos UBER_BASE ✅ COMPLETO (2026-04-05)
 ```
 [x] Setup del repositorio (monorepo Turborepo + pnpm workspaces)
 [x] docker-compose con 6 servicios (TimescaleDB, Redis, Bull Board, Prometheus, Grafana, Jaeger)

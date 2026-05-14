@@ -1,6 +1,6 @@
 # Snapshot: auth
 > Autenticación de todos los actores — OTP, JWT, refresh token.
-> Última actualización: 2026-05-13 — Sprint 0
+> Última actualización: 2026-05-14 — Sprint 1 ✅
 
 ---
 
@@ -57,22 +57,60 @@ apps/api/src/modules/auth/
 
 ## Tokens
 
-- **Access token:** JWT, expira en 15 minutos, firmado con RS256
-- **Refresh token:** Opaco, almacenado en Redis, expira en 30 días
-- **Payload del JWT:**
+- **Access token:** JWT, expira en 15 minutos, firmado con `JWT_SECRET`
+- **Refresh token:** Opaco con JTI, almacenado en Redis + PostgreSQL, expira en 30 días
+- **Payload del JWT (Sprint 1+):**
   ```json
-  { "sub": "uuid", "role": "custodio", "iat": 0, "exp": 0 }
+  {
+    "sub": "uuid",
+    "roles": ["custodio"],
+    "region": "MX",
+    "tenant_id": "company-uuid-o-null",
+    "iat": 0,
+    "exp": 0
+  }
   ```
+- `tenant_id` es `undefined` si el usuario no pertenece a ninguna empresa todavía.
 
 ---
 
 ## Middleware de autenticación
 
 ```typescript
-// Aplicar a todas las rutas protegidas
+// Autenticación base — todas las rutas protegidas
 fastify.addHook('preHandler', authenticate);
+
+// Autorización por rol
 fastify.addHook('preHandler', authorize(['supervisor', 'dispatcher']));
+
+// Tenant guard — rutas de dominio custodia (/custody, /orders, /clients, /operators)
+fastify.addHook('preHandler', tenantGuard);
 ```
+
+## Roles disponibles (Sprint 1+)
+
+```typescript
+type UserRole =
+  | 'client'      // custodia: solicita órdenes
+  | 'custodio'    // custodia: ejecuta transporte
+  | 'copiloto'    // custodia: acompaña al custodio
+  | 'dispatcher'  // custodia: asigna y coordina
+  | 'supervisor'  // custodia: aprueba y gestiona
+  | 'passenger'   // legacy ride-hailing
+  | 'driver'      // legacy ride-hailing
+  | 'admin';      // sistema
+```
+
+## Estado de implementación (Sprint 1)
+
+| Archivo | Estado |
+|---|---|
+| `auth.service.ts` | ✅ `register(role)`, `verifyPhone` + `refresh` con `tenant_id` |
+| `jwt.service.ts` | ✅ `tenant_id?` en `AccessTokenPayload` y `VerifiedToken` |
+| `authenticate.ts` | ✅ `JWTPayload` con `tenant_id?` |
+| `tenant.middleware.ts` | ✅ `tenantGuard` — 403 en rutas custodia sin tenant |
+| `auth.service.test.ts` | ✅ 28 tests (incluyendo 8 nuevos para roles + tenant_id) |
+| `tenant.middleware.test.ts` | ✅ 8 tests |
 
 ---
 

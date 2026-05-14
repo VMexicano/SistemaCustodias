@@ -7,6 +7,7 @@ export interface JWTPayload {
   sub: string;
   roles: string[];
   region: string;
+  tenant_id?: string;
   jti?: string;
 }
 

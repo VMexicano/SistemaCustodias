@@ -1,9 +1,14 @@
 import type { Redis } from 'ioredis';
+import type { Database } from '../../config/database.js';
 import type { OTPChannel } from './otp/otp-channel.interface.js';
 import type { JWTService } from './jwt.service.js';
 import type { UserAuthRepository } from './user-auth.repository.js';
 import type { UsersRepository, User } from '../users/users.repository.js';
 import { BusinessError } from '../../shared/errors/business-error.js';
+
+export type CustodyRole = 'client' | 'custodio' | 'copiloto' | 'dispatcher' | 'supervisor';
+export type LegacyRole = 'passenger' | 'driver' | 'admin';
+export type UserRole = CustodyRole | LegacyRole;
 
 export interface AuthTokensDTO {
   accessToken: string;
@@ -43,11 +48,20 @@ export class AuthService {
     private readonly otpChannel: OTPChannel,
     private readonly jwtService: JWTService,
     private readonly userAuthRepo: UserAuthRepository,
+    private readonly db: Database,
   ) {}
 
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  private async resolveCompanyId(userId: string): Promise<string | undefined> {
+    const row = await this.db<{ company_id: string }>('company_users')
+      .where({ user_id: userId })
+      .select('company_id')
+      .first();
+    return row?.company_id;
+  }
 
   private generateOtp(): string {
     // In TEST_MODE use a fixed OTP so E2E tests can authenticate deterministically
@@ -66,14 +80,18 @@ export class AuthService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Register a new user with phone + full name.
-   * Sends an OTP for phone verification.
+   * Register a new user with phone + full name + role.
+   * role defaults to 'passenger' for backwards compatibility with ride-hailing flows.
+   * For custody flows, pass the explicit role: 'client' | 'custodio' | 'copiloto' | 'dispatcher' | 'supervisor'.
    */
-  async register(phone: string, fullName: string): Promise<{ expiresIn: number }> {
+  async register(
+    phone: string,
+    fullName: string,
+    role: UserRole = 'passenger',
+  ): Promise<{ expiresIn: number }> {
     const existing = await this.usersRepo.findByPhoneIncludingDeleted(phone);
 
     if (existing) {
-      // Soft-deleted accounts can re-register; other states block them.
       if (existing.deleted_at === null) {
         if (existing.status === 'banned') {
           throw new BusinessError('PHONE_BANNED');
@@ -83,7 +101,7 @@ export class AuthService {
     }
 
     const user = await this.usersRepo.create({ phone, fullName });
-    await this.usersRepo.addRole(user.id, 'passenger');
+    await this.usersRepo.addRole(user.id, role);
 
     await this.sendAndStoreOtp(phone);
 
@@ -116,18 +134,19 @@ export class AuthService {
     await this.usersRepo.update(user.id, { phoneVerified: true });
 
     const roles = await this.usersRepo.getRoles(user.id);
+    const tenant_id = await this.resolveCompanyId(user.id);
 
-    const accessToken = this.jwtService.signAccess({ sub: user.id, roles, region: 'MX' });
+    const accessToken = this.jwtService.signAccess({ sub: user.id, roles, region: 'MX', tenant_id });
     const { token: refreshToken, jti } = this.jwtService.signRefresh({
       sub: user.id,
       roles,
       region: 'MX',
+      tenant_id,
     });
 
     const exp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await this.userAuthRepo.upsertJti(user.id, jti, exp);
 
-    // Return the updated user state (phone_verified = true)
     const updatedUser: User = { ...user, phone_verified: true };
 
     return {
@@ -191,16 +210,19 @@ export class AuthService {
     }
 
     const roles = await this.usersRepo.getRoles(user.id);
+    const tenant_id = await this.resolveCompanyId(user.id);
 
     const newAccessToken = this.jwtService.signAccess({
       sub: user.id,
       roles,
       region: 'MX',
+      tenant_id,
     });
     const { token: newRefreshToken, jti: newJti } = this.jwtService.signRefresh({
       sub: user.id,
       roles,
       region: 'MX',
+      tenant_id,
     });
 
     const newExp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);

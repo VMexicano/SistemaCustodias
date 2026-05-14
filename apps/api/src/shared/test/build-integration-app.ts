@@ -162,7 +162,7 @@ export async function buildIntegrationApp(
   const userAuthRepo = new UserAuthRepository(db);
   const usersRepo = new UsersRepository(db);
 
-  const authService = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo);
+  const authService = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo, db);
   await app.register(authRoutes, { prefix: '/auth', authService });
 
   const usersService = new UsersService(usersRepo, db);

@@ -71,7 +71,9 @@ export type BusinessErrorCode =
   // General
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
-  | 'VALIDATION_ERROR';
+  | 'VALIDATION_ERROR'
+  // Custody — multi-tenant
+  | 'TENANT_REQUIRED';
 
 const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   PASSENGER_HAS_ACTIVE_TRIP: 409,
@@ -131,6 +133,7 @@ const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   VALIDATION_ERROR: 422,
+  TENANT_REQUIRED: 403,
 };
 
 export class BusinessError extends Error {

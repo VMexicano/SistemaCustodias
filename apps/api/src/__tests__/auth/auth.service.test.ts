@@ -10,6 +10,7 @@ import type { UsersRepository, User } from '../../modules/users/users.repository
 import type { UserAuthRepository, UserAuthRecord } from '../../modules/auth/user-auth.repository.js';
 import type { OTPChannel } from '../../modules/auth/otp/otp-channel.interface.js';
 import type { JWTService } from '../../modules/auth/jwt.service.js';
+import type { Database } from '../../config/database.js';
 import type { Redis } from 'ioredis';
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,14 @@ function makeJwtService(): jest.Mocked<JWTService> {
   } as unknown as jest.Mocked<JWTService>;
 }
 
+function makeDb(companyId?: string): jest.Mocked<Database> {
+  const firstMock = jest.fn().mockResolvedValue(companyId ? { company_id: companyId } : undefined);
+  const selectMock = jest.fn().mockReturnValue({ first: firstMock });
+  const whereMock = jest.fn().mockReturnValue({ select: selectMock });
+  const queryBuilder = jest.fn().mockReturnValue({ where: whereMock });
+  return queryBuilder as unknown as jest.Mocked<Database>;
+}
+
 // ---------------------------------------------------------------------------
 // Fixture: a minimal active user
 // ---------------------------------------------------------------------------
@@ -83,6 +92,7 @@ describe('AuthService.register', () => {
   let redis: ReturnType<typeof makeRedis>;
   let otpChannel: ReturnType<typeof makeOtpChannel>;
   let jwtService: ReturnType<typeof makeJwtService>;
+  let db: ReturnType<typeof makeDb>;
   let service: AuthService;
 
   beforeEach(() => {
@@ -91,7 +101,8 @@ describe('AuthService.register', () => {
     redis = makeRedis();
     otpChannel = makeOtpChannel();
     jwtService = makeJwtService();
-    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo);
+    db = makeDb();
+    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo, db);
   });
 
   it('creates a user and sends OTP when phone is new', async () => {
@@ -112,6 +123,33 @@ describe('AuthService.register', () => {
       expect.stringMatching(/^\d{6}$/),
     );
     expect(result).toEqual({ expiresIn: 600 });
+  });
+
+  it.each(['client', 'custodio', 'copiloto', 'dispatcher', 'supervisor'] as const)(
+    'registers user with custody role %s and calls addRole correctly',
+    async (role) => {
+      usersRepo.findByPhoneIncludingDeleted.mockResolvedValue(null);
+      usersRepo.create.mockResolvedValue(activeUser);
+      usersRepo.addRole.mockResolvedValue(undefined);
+      redis.set.mockResolvedValue('OK');
+      otpChannel.send.mockResolvedValue(undefined);
+
+      await service.register('+525512345678', 'Juan Pérez', role);
+
+      expect(usersRepo.addRole).toHaveBeenCalledWith(activeUser.id, role);
+    },
+  );
+
+  it('defaults to passenger role when no role is specified', async () => {
+    usersRepo.findByPhoneIncludingDeleted.mockResolvedValue(null);
+    usersRepo.create.mockResolvedValue(activeUser);
+    usersRepo.addRole.mockResolvedValue(undefined);
+    redis.set.mockResolvedValue('OK');
+    otpChannel.send.mockResolvedValue(undefined);
+
+    await service.register('+525512345678', 'Juan Pérez');
+
+    expect(usersRepo.addRole).toHaveBeenCalledWith(activeUser.id, 'passenger');
   });
 
   it('throws PHONE_ALREADY_REGISTERED when phone exists and is active', async () => {
@@ -166,6 +204,7 @@ describe('AuthService.verifyPhone', () => {
   let redis: ReturnType<typeof makeRedis>;
   let otpChannel: ReturnType<typeof makeOtpChannel>;
   let jwtService: ReturnType<typeof makeJwtService>;
+  let db: ReturnType<typeof makeDb>;
   let service: AuthService;
 
   beforeEach(() => {
@@ -174,7 +213,8 @@ describe('AuthService.verifyPhone', () => {
     redis = makeRedis();
     otpChannel = makeOtpChannel();
     jwtService = makeJwtService();
-    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo);
+    db = makeDb();
+    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo, db);
 
     // Common happy-path defaults
     usersRepo.findByPhone.mockResolvedValue(activeUser);
@@ -230,6 +270,32 @@ describe('AuthService.verifyPhone', () => {
       expect.any(Date),
     );
   });
+
+  it('includes tenant_id in JWT when user belongs to a company', async () => {
+    const dbWithCompany = makeDb('company-uuid-001');
+    const serviceWithTenant = new AuthService(
+      usersRepo, redis, otpChannel, jwtService, userAuthRepo, dbWithCompany,
+    );
+
+    await serviceWithTenant.verifyPhone('+525512345678', '654321');
+
+    expect(jwtService.signAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant_id: 'company-uuid-001' }),
+    );
+    expect(jwtService.signRefresh).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant_id: 'company-uuid-001' }),
+    );
+  });
+
+  it('omits tenant_id from JWT when user has no company', async () => {
+    await service.verifyPhone('+525512345678', '654321');
+
+    expect(jwtService.signAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: activeUser.id }),
+    );
+    const callArg = jwtService.signAccess.mock.calls[0]?.[0];
+    expect(callArg?.tenant_id).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -240,6 +306,7 @@ describe('AuthService.login', () => {
   let redis: ReturnType<typeof makeRedis>;
   let otpChannel: ReturnType<typeof makeOtpChannel>;
   let jwtService: ReturnType<typeof makeJwtService>;
+  let db: ReturnType<typeof makeDb>;
   let service: AuthService;
 
   beforeEach(() => {
@@ -248,7 +315,8 @@ describe('AuthService.login', () => {
     redis = makeRedis();
     otpChannel = makeOtpChannel();
     jwtService = makeJwtService();
-    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo);
+    db = makeDb();
+    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo, db);
   });
 
   it('sends OTP when user exists and is active', async () => {
@@ -306,6 +374,7 @@ describe('AuthService.refresh', () => {
   let redis: ReturnType<typeof makeRedis>;
   let otpChannel: ReturnType<typeof makeOtpChannel>;
   let jwtService: ReturnType<typeof makeJwtService>;
+  let db: ReturnType<typeof makeDb>;
   let service: AuthService;
 
   beforeEach(() => {
@@ -314,7 +383,8 @@ describe('AuthService.refresh', () => {
     redis = makeRedis();
     otpChannel = makeOtpChannel();
     jwtService = makeJwtService();
-    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo);
+    db = makeDb();
+    service = new AuthService(usersRepo, redis, otpChannel, jwtService, userAuthRepo, db);
 
     // Common happy-path defaults
     jwtService.verify.mockReturnValue({

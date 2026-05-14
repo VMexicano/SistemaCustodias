@@ -7,6 +7,7 @@ export interface AccessTokenPayload {
   sub: string;
   roles: string[];
   region: string;
+  tenant_id?: string;
 }
 
 export interface RefreshTokenPayload extends AccessTokenPayload {
@@ -17,6 +18,7 @@ export interface VerifiedToken {
   sub: string;
   roles: string[];
   region: string;
+  tenant_id?: string;
   jti?: string;
 }
 
@@ -29,32 +31,27 @@ export interface VerifiedToken {
 export class JWTService {
   signAccess(payload: AccessTokenPayload): string {
     const options: SignOptions = { expiresIn: env.JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'] };
-    return jwt.sign(
-      {
-        sub: payload.sub,
-        roles: payload.roles,
-        region: payload.region,
-      },
-      env.JWT_SECRET,
-      options,
-    );
+    const claims: Record<string, unknown> = {
+      sub: payload.sub,
+      roles: payload.roles,
+      region: payload.region,
+    };
+    if (payload.tenant_id !== undefined) claims['tenant_id'] = payload.tenant_id;
+    return jwt.sign(claims, env.JWT_SECRET, options);
   }
 
   signRefresh(payload: AccessTokenPayload): { token: string; jti: string } {
     const jti = randomUUID();
     const options: SignOptions = { expiresIn: env.JWT_REFRESH_EXPIRES_IN as SignOptions['expiresIn'] };
+    const claims: Record<string, unknown> = {
+      sub: payload.sub,
+      roles: payload.roles,
+      region: payload.region,
+      jti,
+    };
+    if (payload.tenant_id !== undefined) claims['tenant_id'] = payload.tenant_id;
 
-    const token = jwt.sign(
-      {
-        sub: payload.sub,
-        roles: payload.roles,
-        region: payload.region,
-        jti,
-      },
-      env.JWT_REFRESH_SECRET,
-      options,
-    );
-
+    const token = jwt.sign(claims, env.JWT_REFRESH_SECRET, options);
     return { token, jti };
   }
 
@@ -68,13 +65,13 @@ export class JWTService {
         sub: decoded['sub'] as string,
         roles: decoded['roles'] as string[],
         region: decoded['region'] as string,
+        tenant_id: decoded['tenant_id'] as string | undefined,
         jti: decoded['jti'] as string | undefined,
       };
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         throw new BusinessError('TOKEN_EXPIRED');
       }
-      // JsonWebTokenError, NotBeforeError, or anything else
       throw new BusinessError('TOKEN_INVALID');
     }
   }

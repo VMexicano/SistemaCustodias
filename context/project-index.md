@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-13 — Sprint 0 iniciado. Infraestructura de IA establecida.
+> Última actualización: 2026-05-14 — Sprint 1 completado. Schema BD + Auth + TenantMiddleware activos.
 
 ---
 
@@ -53,7 +53,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 
 | # | Módulo | Estado | Descripción |
 |---|---|---|---|
-| 01 | `auth` | ⬜ Pendiente | OTP, JWT, refresh token — todos los actores |
+| 01 | `auth` | ✅ Sprint 1 | OTP, JWT con `tenant_id` + `role`, 5 roles custodia, TenantMiddleware |
 | 02 | `clients` | ⬜ Pendiente | Gestión de clientes (empresa/persona) |
 | 03 | `operadores` | ⬜ Pendiente | Custodios y copilotos — onboarding, documentos, disponibilidad |
 | 04 | `custody-orders` | ⬜ Pendiente | State machine completo de la orden de custodia |
@@ -66,6 +66,25 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 11 | `scheduler` | ⬜ Pendiente | Órdenes programadas, ventanas de despacho |
 | 12 | `admin` | ⬜ Pendiente | Dashboard despachador/supervisor |
 | 13 | `compliance` | ⬜ Pendiente | Cadena de custodia, firma digital, regulatorio |
+
+## Migraciones aplicadas
+
+```
+M-001–038  UBER_BASE heredadas (ride-hailing)  ← no modificar
+M-039      custody_types                        ✅ Sprint 1
+M-040      clients                              ✅ Sprint 1
+M-041      custody_vehicles                     ✅ Sprint 1
+M-042      operators                            ✅ Sprint 1
+M-043      custody_orders                       ✅ Sprint 1
+M-044      value_declarations                   ✅ Sprint 1
+M-045      order_transitions (INSERT-ONLY)      ✅ Sprint 1
+M-046      security_alerts                      ✅ Sprint 1
+M-047      location_readings (hypertable)       ✅ Sprint 1
+M-048      pricing_rules                        ✅ Sprint 1
+M-049      custody_payments                     ✅ Sprint 1
+M-050      alter_companies_add_tenant_id        ✅ Sprint 1
+M-051      alter_user_roles_add_custody_check   ✅ Sprint 1
+```
 
 ---
 
@@ -279,6 +298,11 @@ notifications (
 | ADR-006 | Regla dos-personas (custodio + copiloto) en toda orden | ✅ Vigente |
 | ADR-007 | custody_snapshot + pricing_snapshot inmutables | ✅ Vigente |
 | ADR-008 | Soft delete en todas las entidades | ✅ Vigente |
+| ADR-009 | Multi-tenant activo desde S1 — TenantMiddleware antes de S3 | ✅ Vigente |
+| ADR-010 | Módulos UBER_BASE intactos — dominio custodia en paralelo | ✅ Vigente |
+| ADR-011 | GPS: IGpsProvider interface — MockAdapter MVP, WinlogAdapter posterior | ✅ Vigente |
+| ADR-012 | CustodyEvent envelope con doble timestamp anti-fraude | ✅ Vigente |
+| ADR-013 | Modelo de precios en dos niveles: por viaje (cliente) + renta fija (empresa custodio) | ✅ Vigente |
 
 ---
 

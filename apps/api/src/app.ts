@@ -196,6 +196,7 @@ export async function buildApp() {
     otpChannel,
     jwtService,
     userAuthRepo,
+    db,
   );
 
   await app.register(authRoutes, { prefix: '/auth', authService });

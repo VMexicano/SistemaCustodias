@@ -1,26 +1,26 @@
 services:
   postgres:
     image: timescale/timescaledb:latest-pg15
-    container_name: ridebase_postgres
+    container_name: custodias_postgres
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: ridebase_user
-      POSTGRES_PASSWORD: ridebase_pass
-      POSTGRES_DB: ridebase_dev
+      POSTGRES_USER: custodias_user
+      POSTGRES_PASSWORD: custodias_pass
+      POSTGRES_DB: custodias_dev
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ridebase_user -d ridebase_dev"]
+      test: ["CMD-SHELL", "pg_isready -U custodias_user -d custodias_dev"]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
-      - ridebase_network
+      - custodias_network
 
   redis:
     image: redis:7-alpine
-    container_name: ridebase_redis
+    container_name: custodias_redis
     ports:
       - "6379:6379"
     volumes:
@@ -32,11 +32,11 @@ services:
       retries: 5
     command: redis-server --appendonly yes
     networks:
-      - ridebase_network
+      - custodias_network
 
   bull-board:
     image: deadly0/bull-board:latest
-    container_name: ridebase_bull_board
+    container_name: custodias_bull_board
     ports:
       - "3001:3000"
     environment:
@@ -46,11 +46,11 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - ridebase_network
+      - custodias_network
 
   prometheus:
     image: prom/prometheus:v2.52.0
-    container_name: ridebase_prometheus
+    container_name: custodias_prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -62,11 +62,11 @@ services:
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
-      - ridebase_network
+      - custodias_network
 
   grafana:
     image: grafana/grafana:10.4.2
-    container_name: ridebase_grafana
+    container_name: custodias_grafana
     ports:
       - "3000:3000"
     environment:
@@ -79,18 +79,18 @@ services:
     depends_on:
       - prometheus
     networks:
-      - ridebase_network
+      - custodias_network
 
   jaeger:
     image: jaegertracing/all-in-one:1.57
-    container_name: ridebase_jaeger
+    container_name: custodias_jaeger
     ports:
       - "16686:16686"
       - "4318:4318"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     networks:
-      - ridebase_network
+      - custodias_network
 
 volumes:
   postgres_data:
@@ -99,5 +99,5 @@ volumes:
   grafana_data:
 
 networks:
-  ridebase_network:
+  custodias_network:
     driver: bridge

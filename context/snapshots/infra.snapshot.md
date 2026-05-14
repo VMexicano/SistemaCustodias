@@ -1,84 +1,107 @@
 # Snapshot — Infraestructura
-> Última actualización: 2026-05-07 | Estado: ✅ Sprint 17 completo
+> Última actualización: 2026-05-13 | Estado: ✅ Docker levantado — Sprint 1 en curso
 
 ## Estado
 - Monorepo Turborepo: ✅ pnpm 9 + workspaces
-- docker-compose: ✅ 6 servicios (infra only — apps corren nativas)
-- Migraciones: ✅ 38 migraciones aplicadas (migration 001 → 038)
-- Seeds: ✅ 11 seeds aplicados (01–11)
+- docker-compose: ✅ 6 servicios activos (renombrados de ridebase_ → custodias_)
+- Migraciones UBER_BASE: ✅ 38 migraciones heredadas (migration 001 → 038) — no correr aún
+- Migraciones custodia: ⬜ Pendiente (M-39 → M-51, Sprint 1)
+- Seeds: ✅ 11 seeds UBER_BASE · ⬜ seed custody_types pendiente (Sprint 1)
 - Jest + Testcontainers: ✅ Configurado (API modular v10)
-- Playwright: ✅ 6 specs smoke (auth, estimate, admin-web, trip-detail-vertical, vertical-editor, approval-flow)
+- Playwright: ✅ 6 specs smoke heredados
 - CI/CD: ✅ GitHub Actions (lint + type-check + test)
 - Deploy: 🔲 No configurado (staging Railway/Render pendiente)
 
-## Servicios en docker-compose
+## Servicios en docker-compose (todos ✅ RUNNING)
 
-```
-postgres   → timescale/timescaledb:latest-pg15  puerto 5432
-redis      → redis:7-alpine                     puerto 6379
-bull-board → bull-board UI                      puerto 3001
-prometheus → prom/prometheus:v2.52.0            puerto 9090
-grafana    → grafana:10.4.2                     puerto 3000
-jaeger     → jaeger:1.57                        puerto 16686 (UI), 4318 (OTLP)
-```
+| Contenedor | Imagen | Puerto host | Estado |
+|---|---|---|---|
+| custodias_postgres | timescale/timescaledb:latest-pg15 | **5432** | ✅ healthy |
+| custodias_redis | redis:7-alpine | **6379** | ✅ healthy |
+| custodias_bull_board | deadly0/bull-board | **3001** | ✅ up |
+| custodias_grafana | grafana/grafana:10.4.2 | **3000** | ✅ up |
+| custodias_prometheus | prom/prometheus:v2.52.0 | **9090** | ✅ up |
+| custodias_jaeger | jaegertracing/all-in-one:1.57 | **16686** (UI), **4318** (OTLP) | ✅ up |
 
 ## URLs locales de desarrollo
 
 ```
-API (Fastify)   http://localhost:3333
-Backoffice web  http://localhost:5173   (Vite dev server)
-Mobile Metro    http://localhost:8081
-Bull Board      http://localhost:3001
-Grafana         http://localhost:3000
-Prometheus      http://localhost:9090
-Jaeger          http://localhost:16686
-PostgreSQL      localhost:5432  (ridebase_user / ridebase_pass / ridebase_dev)
-Redis           localhost:6379  (sin auth)
+API (Fastify)   http://localhost:3333    — app Node.js (nativa, no en docker)
+Backoffice web  http://localhost:5173    — Vite dev server (nativo)
+Mobile Metro    http://localhost:8081    — Expo Metro bundler (nativo)
+Bull Board      http://localhost:3001    — Monitor de colas BullMQ
+Grafana         http://localhost:3000    — Dashboards de métricas  (admin/admin)
+Prometheus      http://localhost:9090    — Scraping de métricas
+Jaeger          http://localhost:16686   — Tracing distribuido
+PostgreSQL      localhost:5432           — custodias_user / custodias_pass / custodias_dev
+Redis           localhost:6379           — sin auth
+TimescaleDB     (extensión de postgres)  — versión 2.26.1 ✅ activa
+```
+
+## Credenciales de desarrollo (NO usar en producción)
+
+```
+PostgreSQL:
+  host:     localhost:5432
+  user:     custodias_user
+  password: custodias_pass
+  database: custodias_dev
+
+Redis:
+  url:  redis://localhost:6379
+  auth: ninguna (dev only)
+
+Grafana:
+  url:  http://localhost:3000
+  user: admin / admin
 ```
 
 ## Comandos de setup
 
 ```bash
-pnpm install                                   # instalar dependencias
-docker compose up -d                           # levantar infra
-pnpm --filter @ridebase/api db:migrate         # correr migraciones (38 en Sprint 17)
-pnpm --filter @ridebase/api db:seed            # correr seeds (11 en Sprint 17)
-pnpm dev                                       # levantar api + web + metro en paralelo
+# 1. Instalar dependencias
+pnpm install
+
+# 2. Levantar infraestructura (requiere Docker Desktop)
+docker compose up -d
+
+# 3. Verificar que postgres y redis están sanos
+docker compose ps
+
+# 4. Correr migraciones UBER_BASE (38 heredadas)
+pnpm --filter @custodias/api db:migrate
+
+# 5. Correr seeds base
+pnpm --filter @custodias/api db:seed
+
+# 6. Levantar apps en desarrollo
+pnpm dev
 ```
 
-Guía completa (12 pasos): `docs/VERTICAL_CLONE_GUIDE.md`
+> ⚠️ Paso 4 y 5 requieren que las apps/api estén configuradas con el nuevo `@custodias/api` package name.
+> Por ahora la API hereda el nombre `@ridebase/api` — se renombrará en INFRA-001.
 
-## Variables de entorno requeridas (apps/api/.env)
+## Variables de entorno (apps/api/.env)
 
 ```bash
-# Obligatorias
-DATABASE_URL=postgresql://ridebase_user:ridebase_pass@localhost:5432/ridebase_dev
+NODE_ENV=development
+PORT=3333
+DATABASE_URL=postgresql://custodias_user:custodias_pass@localhost:5432/custodias_dev
 REDIS_URL=redis://localhost:6379
-JWT_SECRET=<64+ chars random>
-JWT_REFRESH_SECRET=<64+ chars random, distinto al anterior>
+JWT_SECRET=custodias-dev-jwt-secret-change-in-production-min-64-chars-xxxxxxxxxxxxx
+JWT_REFRESH_SECRET=custodias-dev-refresh-secret-change-in-production-different-from-above-xx
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=30d
-PORT=3333
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
-OTP_PROVIDER=log                               # log en dev, firebase en prod
-STRIPE_SECRET_KEY=sk_test_...                  # requerido por validación Zod de entorno
-VERTICAL_SLUG=taxi                             # taxi | custody | cold-chain
-
-# Opcionales en desarrollo
-LOG_LEVEL=info
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTP_PROVIDER=log
+STRIPE_SECRET_KEY=sk_test_replace_with_your_stripe_test_key
+VERTICAL_SLUG=custody
 TEST_OTP_BYPASS=false
 TEST_OTP_CODE=123456
-
-# Solo en producción
-FIREBASE_PROJECT_ID=...
-FIREBASE_CLIENT_EMAIL=...
-FIREBASE_PRIVATE_KEY="..."
 ```
 
-> ⚠️ No hay Google Maps Key — el proyecto usa **Mapbox** (`@rnmapbox/maps`) desde Sprint 8 (ADR-031).
-> ⚠️ No hay Twilio — OTP via `log` (dev) o Firebase (prod) desde Sprint 2 (ADR-018).
+> ⚠️ OTP via `log` en dev (mensajes aparecen en consola de la API).
+> ⚠️ No hay Google Maps Key — el proyecto usa **Mapbox** (`@rnmapbox/maps`).
+> ⚠️ No hay Twilio — OTP via `log` (dev) o Firebase (prod).
 
 ## Migraciones activas (38 total)
 
