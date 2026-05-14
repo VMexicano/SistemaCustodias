@@ -38,6 +38,30 @@
 
 ## Próximas Tareas — Orden Recomendado
 
+### Sprint 8 SistemaCustodias — módulo custody-payments ✅ COMPLETO (2026-05-14)
+```
+[x] PAY-CUST-001: módulo custody-payments completo
+    [x] custody-payments.types.ts — CustodyPayment, CustodyPaymentStatus, CustodyPaymentJobData
+    [x] custody-payments.repository.ts — findByOrderId, create, updateStatus
+    [x] custody-payments.service.ts — getByOrderId, processPayment (idempotencia + fallbacks)
+    [x] custody-payments.controller.ts — GET /orders/:id/payment
+    [x] custody-payments.routes.ts
+    [x] custody-payments.queue.ts — BullMQ Queue 'custody-payments' (3 reintentos exp. backoff 5s)
+    [x] custody-payment-worker.ts — procesa 'process-payment' jobs
+    [x] business-error.ts: INVALID_ORDER_STATUS_FOR_PAYMENT (409)
+    [x] custody-orders.controller.ts modificado — +enqueue custodyPaymentsQueue en complete()
+    [x] custody-orders.routes.ts modificado — acepta paymentsQueue opcional
+    [x] app.ts wiring — CustodyPaymentsRepository + CustodyPaymentService + controller + worker
+    [x] Sin migración — tabla custody_payments ya existía desde M-049 (Sprint 1 infra)
+[x] PAY-CUST-QA-001: 17 tests — custody-payment-service.test.ts
+    [x] CustodyPaymentService: 100% lines / 100% branches (umbral: ≥80%/75%) ✅
+    [x] Casos: ORDER_NOT_FOUND, INVALID_ORDER_STATUS_FOR_PAYMENT, idempotencia, pricing_snapshot_missing,
+        client_not_found, no_payment_method_on_file (×2 branches), gateway success (×2), gateway failure,
+        truncación 255 chars, non-Error rejection, Math.round cents
+[x] ADR-018: IPaymentGateway UBER_BASE reutilizada en módulo custody separado
+[x] TypeScript: 0 errores
+```
+
 ### Sprint 7 SistemaCustodias — módulo custody-notifications ✅ COMPLETO (2026-05-14)
 ```
 [x] NOTIF-001: módulo custody-notifications completo

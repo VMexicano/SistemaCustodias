@@ -3,11 +3,13 @@ import type { Queue } from 'bullmq';
 import type { CustodyOrdersService } from './custody-orders.service.js';
 import type { OrderStatus } from './custody-orders.types.js';
 import type { CustodyNotificationJobData } from '../custody-notifications/custody-notifications.types.js';
+import type { CustodyPaymentJobData } from '../custody-payments/custody-payments.types.js';
 
 export class CustodyOrdersController {
   constructor(
     private readonly service: CustodyOrdersService,
     private readonly notificationsQueue?: Queue<CustodyNotificationJobData>,
+    private readonly paymentsQueue?: Queue<CustodyPaymentJobData>,
   ) {}
 
   private actor(request: FastifyRequest) {
@@ -173,6 +175,14 @@ export class CustodyOrdersController {
     const { id } = request.params as { id: string };
     const result = await this.service.complete(id, this.actor(request));
     this.enqueueTransitionNotification(request, result);
+    if (this.paymentsQueue) {
+      this.paymentsQueue
+        .add('process-payment', {
+          orderId: result.id,
+          tenantId: request.user!.tenant_id ?? 'default',
+        })
+        .catch(() => { /* non-fatal */ });
+    }
     return reply.send(result);
   }
 

@@ -111,6 +111,12 @@ import { LogSmsClient } from './modules/custody-notifications/sms.client.js';
 import { CircuitBreaker } from './modules/custody-notifications/circuit-breaker.js';
 import { initCustodyNotificationsQueue, custodyNotificationsQueue } from './queues/custody-notifications.queue.js';
 import { registerCustodyNotificationWorker } from './workers/custody-notification-worker.js';
+import { CustodyPaymentsRepository } from './modules/custody-payments/custody-payments.repository.js';
+import { CustodyPaymentService } from './modules/custody-payments/custody-payments.service.js';
+import { CustodyPaymentsController } from './modules/custody-payments/custody-payments.controller.js';
+import { custodyPaymentsRoutes } from './modules/custody-payments/custody-payments.routes.js';
+import { initCustodyPaymentsQueue, custodyPaymentsQueue } from './queues/custody-payments.queue.js';
+import { registerCustodyPaymentWorker } from './workers/custody-payment-worker.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -486,8 +492,30 @@ export async function buildApp() {
   );
   registerCustodyNotificationWorker(redis, custodyNotificationService, db);
 
-  // Register orders routes now that custodyNotificationsQueue is initialized
-  await app.register(ordersRoutes, { prefix: '/orders', ordersService: custodyOrdersService, notificationsQueue: custodyNotificationsQueue });
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — custody-payments module (Sprint 8)
+  // ---------------------------------------------------------------------------
+
+  initCustodyPaymentsQueue(redis);
+
+  const custodyPaymentsRepo = new CustodyPaymentsRepository(db);
+  const custodyPaymentService = new CustodyPaymentService(custodyPaymentsRepo, paymentGateway, db);
+  const custodyPaymentsController = new CustodyPaymentsController(custodyPaymentService);
+  registerCustodyPaymentWorker(redis, custodyPaymentService);
+
+  // Register orders routes now that both notification and payment queues are initialized
+  await app.register(ordersRoutes, {
+    prefix: '/orders',
+    ordersService: custodyOrdersService,
+    notificationsQueue: custodyNotificationsQueue,
+    paymentsQueue: custodyPaymentsQueue,
+  });
+
+  // GET /orders/:id/payment
+  await app.register(custodyPaymentsRoutes, {
+    prefix: '/orders/:id/payment',
+    controller: custodyPaymentsController,
+  });
 
   // ---------------------------------------------------------------------------
   // Dependency wiring — alerts module (Sprint 6)

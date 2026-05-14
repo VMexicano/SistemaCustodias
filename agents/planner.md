@@ -170,6 +170,9 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 4 Custodias] Columnas reales vs. spec: la columna es declared_value (singular), NO declared_values — siempre leer el archivo de migración real antes de escribir tipos y repositorios
 ✓ [Sprint 4 Custodias] Jest mock hoisting + factories: jest.mock() se eleva antes que las declaraciones — la factory NO puede referenciar variables del scope externo. Usar jest.fn() directamente en la factory, luego obtener ref via import: const mockFn = importedModule.method as jest.Mock
 ✓ [Sprint 4 Custodias] trx como función callable en mocks: Knex transaction callback recibe trx que se llama como función (trx('tabla')). El mock debe ser jest.fn().mockImplementation((table) => chain), NO un objeto plano
+✓ [Sprint 8 Custodias] IPaymentGateway del UBER_BASE es reutilizable directamente en módulos custody — no duplicar la interfaz ni la implementación Stripe
+✓ [Sprint 8 Custodias] npx jest SIEMPRE desde apps/api/, nunca desde la raíz del monorepo — desde raíz usa babel-jest que no soporta import type
+✓ [Sprint 8 Custodias] Idempotencia de pagos: el service DEBE verificar si ya existe un registro 'completed' antes de enqueue al gateway — documentar el check en el spec
 ✓ [Sprint 4 Custodias] apiClient mock en React Native tests: usar factory explícita en jest.mock — auto-mock carga axios que falla en entorno React Native con "Cannot cancel a stream that already has a reader"
 ✓ [Sprint 17] FK cross-table para actores no-users: si el actor es supervisor/dispatcher, campos con FK → users.id deben recibir actorId: null; preservar identidad en columnas dedicadas
 ✓ [Sprint 17] Smoke specs: documentar el contrato auth completo de cada actor (supervisor = username+password vs cliente/operador = OTP)

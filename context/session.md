@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 8 PENDIENTE — módulo payments (Stripe facturación + cobro automático al COMPLETED)
+**Sprint:** 9 PENDIENTE — módulo scheduler (órdenes programadas, ventanas de despacho)
 **Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [PAYMENTS]
-**Objetivo:** Próxima sesión: implementar el módulo payments para órdenes de custodia
+**Tipo de contexto:** [SCHEDULER]
+**Objetivo:** Próxima sesión: implementar el módulo scheduler para órdenes de custodia programadas
 
 ---
 
@@ -129,13 +129,26 @@
 
 ---
 
-## Próxima sesión — Sprint 7
+## Sprint 8 — COMPLETO ✅ (2026-05-14)
 
-**Objetivo:** Módulo `notifications` — FCM push + SMS fallback + circuit breaker para alertas critical/high
+**Resultado:** Módulo custody-payments implementado y aprobado. 17 tests, 100% cobertura service.
+
+**Entregables:**
+- CustodyPaymentService: cobro Stripe post-COMPLETED, idempotencia, 5 fallback modes
+- BullMQ worker con 3 reintentos, backoff exponencial 5s
+- Reutilización de IPaymentGateway UBER_BASE (ADR-018)
+- GET /orders/:id/payment endpoint
+- Sin migración — tabla custody_payments existía desde M-049
+
+---
+
+## Próxima sesión — Sprint 9
+
+**Objetivo:** Módulo `scheduler` — órdenes de custodia programadas con ventanas de despacho
 
 **Cargar en contexto:**
-- `context/snapshots/notifications.snapshot.md` (principal)
-- `context/snapshots/alerts.snapshot.md` (secundario — alerts disparan notificaciones)
+- `context/snapshots/scheduler.snapshot.md` (principal)
+- `context/snapshots/custody-orders.snapshot.md` (secundario — scheduler dispara órdenes)
 - `steering/coding-standards.md`
 
 ---

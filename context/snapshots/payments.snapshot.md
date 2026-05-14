@@ -1,10 +1,40 @@
-# Snapshot — Módulo: payments
-> Última actualización: 2026-04-07 | Estado: ✅ Sprint 5 completo
+# Snapshot — Módulo: payments (UBER_BASE) + custody-payments (Sprint 8)
+> Última actualización: 2026-05-14 | Estado: ✅ Sprint 5 (UBER_BASE) + ✅ Sprint 8 (custody) completos
 
-## Estado
+## Estado — UBER_BASE payments (viajes)
 - Implementación: 100%
 - Tests: ✅ 100% lines / 96% branches (umbral: 95%/90%) — 40 tests
 - Integrado en app.ts: ✅
+
+## Estado — custody-payments (Sprint 8)
+- Implementación: 100%
+- Tests: ✅ 100% lines / 100% branches — 17 tests (custody-payment-service.test.ts)
+- Integrado en app.ts: ✅
+- ADR-018: IPaymentGateway UBER_BASE reutilizada + BullMQ post-COMPLETED
+
+### Archivos custody-payments
+```
+apps/api/src/modules/custody-payments/
+  custody-payments.types.ts
+  custody-payments.repository.ts
+  custody-payments.service.ts      ← 100% cobertura
+  custody-payments.controller.ts
+  custody-payments.routes.ts
+apps/api/src/queues/custody-payments.queue.ts
+apps/api/src/workers/custody-payment-worker.ts
+```
+
+### Endpoint custody
+```
+GET /orders/:id/payment   → estado del cobro de la orden de custodia
+```
+
+### Flujo custody-payments
+```
+PATCH /orders/:id/complete → COMPLETED
+  → custodyPaymentsQueue.add('process-payment', { orderId, tenantId })
+  → worker: verifica idempotencia → resuelve método de pago → Stripe → completed|failed
+```
 
 ## Responsabilidad
 Cobro automático al pasajero al completar el viaje via Stripe PaymentIntent.

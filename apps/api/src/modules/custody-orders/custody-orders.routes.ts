@@ -6,10 +6,12 @@ import { tenantGuard } from '../../shared/middleware/tenant.middleware.js';
 import { CustodyOrdersController } from './custody-orders.controller.js';
 import type { CustodyOrdersService } from './custody-orders.service.js';
 import type { CustodyNotificationJobData } from '../custody-notifications/custody-notifications.types.js';
+import type { CustodyPaymentJobData } from '../custody-payments/custody-payments.types.js';
 
 export interface OrdersRoutesOptions extends FastifyPluginOptions {
   ordersService: CustodyOrdersService;
   notificationsQueue?: Queue<CustodyNotificationJobData>;
+  paymentsQueue?: Queue<CustodyPaymentJobData>;
 }
 
 const addressSchema = {
@@ -127,7 +129,7 @@ export async function ordersRoutes(
   app: FastifyInstance,
   options: OrdersRoutesOptions,
 ): Promise<void> {
-  const ctrl = new CustodyOrdersController(options.ordersService, options.notificationsQueue);
+  const ctrl = new CustodyOrdersController(options.ordersService, options.notificationsQueue, options.paymentsQueue);
 
   app.post('/', {
     schema: createOrderSchema,

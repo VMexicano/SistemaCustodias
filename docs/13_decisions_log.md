@@ -335,6 +335,32 @@ Las alertas críticas (panic, tamper) y las transiciones de estado de órdenes d
 
 ---
 
+## ADR-018: CustodyPaymentService — reutilización de IPaymentGateway UBER_BASE + BullMQ post-COMPLETED
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+Las órdenes de custodia completadas (estado COMPLETED) deben generar un cobro automático al cliente. El UBER_BASE ya tiene `IPaymentGateway + StripePaymentGateway` para viajes. Era necesario decidir si crear una nueva abstracción custody-específica o reutilizar la existente.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| Nueva interfaz `ICustodyPaymentGateway` | Desacoplada del UBER_BASE | Duplicación de código Stripe sin ganancia real |
+| Reutilizar `IPaymentGateway` del UBER_BASE | Sin duplicación, Stripe ya probado | Dependencia de infrastructura cruzada (aceptable para interfaces) |
+| Pago manual vía endpoint | Más control del cliente | No automatiza el cobro al completar |
+
+**Decisión:** Reutilizar `IPaymentGateway` del UBER_BASE (`modules/payments/payment.gateway.interface.ts`) en el servicio custody. El módulo `custody-payments/` sigue el patrón ADR-014 (separado del UBER_BASE), pero importa solo la interfaz de infraestructura — no lógica de dominio de viajes. El cobro se dispara vía BullMQ al transicionar a COMPLETED (fuera de transacción).
+
+**Consecuencias:**
+- `CustodyPaymentService` acepta `IPaymentGateway` como dependencia inyectada — intercambiable con `MockPaymentGateway` en tests
+- El `custody-orders.controller.ts` encola `process-payment` en `custodyPaymentsQueue` después de `complete()` (non-fatal)
+- Idempotencia: si `custody_payments.status = 'completed'` ya existe para la orden, el worker retorna sin re-cobrar
+- Tabla `custody_payments` ya existía desde M-049 (Sprint 1 infra) — sin migración adicional
+- Método de pago: `passenger_payment_methods` del usuario cliente (default o primero disponible)
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown
