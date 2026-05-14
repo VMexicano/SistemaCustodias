@@ -10,6 +10,7 @@ import type {
   CustodyNotificationJobData,
   NotificationChannel,
   NotificationPriority,
+  ReminderType,
 } from '../modules/custody-notifications/custody-notifications.types.js';
 
 const QUEUE_NAME = 'custody-notifications';
@@ -110,6 +111,8 @@ export function registerCustodyNotificationWorker(
         await handleOrderTransition(data.payload, notificationService, db);
       } else if (data.type === 'alert') {
         await handleAlert(data.payload, notificationService, db);
+      } else if (data.type === 'reminder') {
+        await handleReminder(data.payload, notificationService, db);
       }
     },
     { connection },
@@ -251,6 +254,93 @@ async function handleAlert(
   );
 
   await Promise.all(sendTasks);
+}
+
+// ---------------------------------------------------------------------------
+// handleReminder
+// ---------------------------------------------------------------------------
+
+const REMINDER_MESSAGES: Record<ReminderType, { title: string; body: string }> = {
+  reminder_24h: {
+    title: 'Recordatorio: custodia programada mañana',
+    body: 'Tienes una orden de custodia programada para mañana. Asegúrate de que todo esté listo.',
+  },
+  reminder_1h: {
+    title: 'Recordatorio: custodia en 1 hora',
+    body: 'Tu orden de custodia comienza en aproximadamente 1 hora.',
+  },
+  reminder_15m: {
+    title: 'Custodia en 15 minutos',
+    body: 'Tu orden de custodia comienza en 15 minutos. El equipo está en camino.',
+  },
+  dispatch_alert: {
+    title: '⚠️ Orden sin asignar — ventana de despacho abierta',
+    body: 'Hay una orden APROBADA cuya ventana de despacho ya abrió y no tiene equipo asignado.',
+  },
+};
+
+async function handleReminder(
+  payload: Extract<CustodyNotificationJobData, { type: 'reminder' }>['payload'],
+  notificationService: CustodyNotificationService,
+  db: Knex,
+): Promise<void> {
+  const messages = REMINDER_MESSAGES[payload.reminder_type as ReminderType];
+  if (!messages) return;
+
+  const isDispatchAlert = payload.reminder_type === 'dispatch_alert';
+
+  if (isDispatchAlert) {
+    // Notify all dispatchers
+    const dispatchers = await db('users')
+      .where({ role: 'dispatcher', deleted_at: null })
+      .select('id') as Array<{ id: string }>;
+
+    const tasks = dispatchers.flatMap(({ id: userId }) => [
+      notificationService.send({
+        user_id: userId,
+        order_id: payload.order_id,
+        channel: 'push',
+        priority: 'high',
+        title: messages.title,
+        body: messages.body,
+      }).catch((err: Error) => {
+        console.error(`[CustodyNotificationWorker] dispatch_alert push failed user=${userId}:`, err.message);
+      }),
+      notificationService.send({
+        user_id: userId,
+        order_id: payload.order_id,
+        channel: 'sms',
+        priority: 'high',
+        title: messages.title,
+        body: messages.body,
+      }).catch((err: Error) => {
+        console.error(`[CustodyNotificationWorker] dispatch_alert sms failed user=${userId}:`, err.message);
+      }),
+    ]);
+    await Promise.all(tasks);
+  } else {
+    // Notify client — resolve user_id from clients table
+    const client = await db('clients')
+      .where({ id: payload.client_id })
+      .select('user_id')
+      .first() as { user_id: string } | undefined;
+
+    if (!client) return;
+
+    await notificationService.send({
+      user_id: client.user_id,
+      order_id: payload.order_id,
+      channel: 'push',
+      priority: 'normal',
+      title: messages.title,
+      body: messages.body,
+    }).catch((err: Error) => {
+      console.error(
+        `[CustodyNotificationWorker] reminder ${payload.reminder_type} failed user=${client.user_id}:`,
+        err.message,
+      );
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

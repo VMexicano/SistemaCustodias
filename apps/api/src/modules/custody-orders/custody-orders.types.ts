@@ -103,6 +103,8 @@ export interface CustodyOrderDTO {
   pickupAddress: Address;
   deliveryAddress: Address;
   scheduledAt: string | null;
+  pickupWindowStart: string | null;
+  pickupWindowEnd: string | null;
   custodioId: string | null;
   copilotoId: string | null;
   custodioConfirmedAt: string | null;

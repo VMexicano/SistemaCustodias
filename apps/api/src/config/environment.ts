@@ -26,7 +26,7 @@ const envSchema = z
     // Stripe (required — used in Sprint 2 AUTH-004+)
     STRIPE_SECRET_KEY: z.string().min(1, 'STRIPE_SECRET_KEY is required'),
     // Vertical slug — determines which vertical config is served by GET /config
-    VERTICAL_SLUG: z.string().min(1).default('taxi'),
+    VERTICAL_SLUG: z.string().min(1).default('custody'),
     // Notification delivery provider (Sprint 5 — ADR-028)
     NOTIFICATION_PROVIDER: z.enum(['log', 'fcm']).default('log'),
     // Firebase Admin SDK credentials (required when NOTIFICATION_PROVIDER=fcm)

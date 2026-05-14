@@ -43,6 +43,8 @@ const config: Config = {
     '!src/modules/scheduled-trips/scheduled-trips.controller.ts',
     '!src/modules/scheduled-trips/scheduled-trips.routes.ts',
     '!src/modules/scheduler/scheduler.repository.ts',
+    // custody-scheduler: repository uses raw SQL — integration-tested only
+    '!src/modules/custody-scheduler/custody-scheduler.repository.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],

@@ -47,6 +47,16 @@ export interface NotifyAlertPayload {
   tenant_id: string;
 }
 
+export type ReminderType = 'reminder_24h' | 'reminder_1h' | 'reminder_15m' | 'dispatch_alert';
+
+export interface NotifyReminderPayload {
+  order_id: string;
+  reminder_type: ReminderType;
+  client_id: string;
+  tenant_id: string;
+}
+
 export type CustodyNotificationJobData =
   | { type: 'order-transition'; payload: NotifyOrderTransitionPayload }
-  | { type: 'alert'; payload: NotifyAlertPayload };
+  | { type: 'alert'; payload: NotifyAlertPayload }
+  | { type: 'reminder'; payload: NotifyReminderPayload };

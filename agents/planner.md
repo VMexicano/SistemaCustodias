@@ -174,6 +174,8 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 8 Custodias] npx jest SIEMPRE desde apps/api/, nunca desde la raíz del monorepo — desde raíz usa babel-jest que no soporta import type
 ✓ [Sprint 8 Custodias] Idempotencia de pagos: el service DEBE verificar si ya existe un registro 'completed' antes de enqueue al gateway — documentar el check en el spec
 ✓ [Sprint 4 Custodias] apiClient mock en React Native tests: usar factory explícita en jest.mock — auto-mock carga axios que falla en entorno React Native con "Cannot cancel a stream that already has a reader"
+✓ [Sprint 9 Custodias] Antes de definir el scope de cualquier módulo, leer los archivos en src/modules/{módulo}/ — el módulo puede estar parcialmente implementado y el plan debe adaptarse a lo existente, no reescribirlo
+✓ [Sprint 9 Custodias] Cuando se descubre una implementación existente durante ejecución, ajustar el scope inmediatamente: documentar qué ya existe, qué falta, y actualizar el plan sin reintentar implementar lo que ya funciona
 ✓ [Sprint 17] FK cross-table para actores no-users: si el actor es supervisor/dispatcher, campos con FK → users.id deben recibir actorId: null; preservar identidad en columnas dedicadas
 ✓ [Sprint 17] Smoke specs: documentar el contrato auth completo de cada actor (supervisor = username+password vs cliente/operador = OTP)
 ✓ [Sprint 5 Custodias] Cuando existe un servicio UBER_BASE con nombre base similar (ej: TrackingService), el spec debe declarar explícitamente el nombre del nuevo módulo custodia (ej: CustodyTrackingService) para evitar conflictos de importación en app.ts

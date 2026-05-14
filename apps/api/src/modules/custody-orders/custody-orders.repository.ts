@@ -100,6 +100,21 @@ export class CustodyOrdersRepository {
     return row;
   }
 
+  async updateSchedule(
+    id: string,
+    data: { scheduled_at: Date | null; pickup_window_start: Date | null; pickup_window_end: Date | null },
+  ): Promise<CustodyOrder> {
+    const rows = await this.db<CustodyOrder>('custody_orders')
+      .where({ id })
+      .whereNull('deleted_at')
+      .update({ ...data, updated_at: this.db.fn.now() })
+      .returning('*');
+
+    const row = rows[0];
+    if (!row) throw new Error(`Failed to update schedule for order ${id}: no row returned`);
+    return row;
+  }
+
   async updateStatus(
     id: string,
     status: OrderStatus,

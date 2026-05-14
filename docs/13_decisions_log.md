@@ -361,6 +361,32 @@ Las órdenes de custodia completadas (estado COMPLETED) deben generar un cobro a
 
 ---
 
+## ADR-019: custody-scheduler — activación de recordatorios vía cron (node-cron + FOR UPDATE SKIP LOCKED)
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+Las órdenes de custodia con `scheduled_at` necesitan recordatorios automáticos (24h/1h/15m antes del pickup) y alertas a despachadores cuando la ventana de pickup abre sin equipo asignado. Era necesario decidir el mecanismo de scheduling.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| Cron cada minuto + `FOR UPDATE SKIP LOCKED` | Mismo patrón que UBER_BASE, observable, sin deps nuevas | Mayor granularidad (1 min) vs. exactitud teórica |
+| BullMQ delayed jobs | Exactitud en el tiempo del disparo | Edge cases al reiniciar workers, jobs "perdidos" tras crash |
+| pg_cron (PostgreSQL nativo) | Sin proceso extra | Require extensión adicional, no en Railway por defecto |
+
+**Decisión:** Cron con `node-cron` cada minuto + `custody_scheduled_reminders` table para deduplicación idempotente. El mismo patrón ya establecido en `SchedulerService` UBER_BASE (ADR-025). Deduplicación garantizada por UNIQUE constraint `(order_id, reminder_type)` y `FOR UPDATE SKIP LOCKED`.
+
+**Consecuencias:**
+- `CustodySchedulerService` corre dos tareas por tick: `scanUpcomingReminders` y `scanDispatchAlerts`
+- Side effects (enqueue a `custodyNotificationsQueue`) ocurren FUERA de la transacción (ADR-003)
+- La marca de "enviado" ocurre ANTES del enqueue (dedup-first) para preferir no-duplicar sobre no-perder
+- Tabla `custody_scheduled_reminders` — M-053, UNIQUE en `(order_id, reminder_type)`
+- Endpoints REST `PATCH /orders/:id/schedule` + `DELETE /orders/:id/schedule` permiten programar/desprogramar órdenes DRAFT
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown

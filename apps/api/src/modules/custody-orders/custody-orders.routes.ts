@@ -247,4 +247,28 @@ export async function ordersRoutes(
     preHandler: [...preAuth, authorize('custodio')],
     handler: ctrl.deliveryFailed.bind(ctrl) as RouteHandlerMethod,
   });
+
+  const scheduleSchema = {
+    body: {
+      type: 'object',
+      required: ['scheduledAt'],
+      additionalProperties: false,
+      properties: {
+        scheduledAt: { type: 'string', minLength: 1 },
+        pickupWindowStart: { type: 'string', minLength: 1 },
+        pickupWindowEnd: { type: 'string', minLength: 1 },
+      },
+    },
+  };
+
+  app.patch('/:id/schedule', {
+    schema: scheduleSchema,
+    preHandler: [...preAuth, authorize('client', 'dispatcher')],
+    handler: ctrl.schedule.bind(ctrl) as RouteHandlerMethod,
+  });
+
+  app.delete('/:id/schedule', {
+    preHandler: [...preAuth, authorize('client', 'dispatcher')],
+    handler: ctrl.unschedule.bind(ctrl) as RouteHandlerMethod,
+  });
 }

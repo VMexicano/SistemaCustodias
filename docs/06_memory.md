@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-14 — Sprint 5 SistemaCustodias: módulo custody-tracking GPS tiempo real (POST /tracking/location, GET /tracking/:orderId/current|history, WebSocket namespace /tracking, geofence-check BullMQ worker, geofence.utils haversine) + 35 tests (100% cobertura CustodyTrackingService + geofence.utils).
+> **Última actualización:** 2026-05-14 — Sprint 9 SistemaCustodias: módulo custody-scheduler completo — cron recordatorios 24h/1h/15m + dispatch alerts + PATCH/DELETE /orders/:id/schedule + 15 tests 100% cobertura (POST /tracking/location, GET /tracking/:orderId/current|history, WebSocket namespace /tracking, geofence-check BullMQ worker, geofence.utils haversine) + 35 tests (100% cobertura CustodyTrackingService + geofence.utils).
 
 ---
 
@@ -26,6 +26,7 @@
 | Custody Tracking | ✅ Sprint 5 | GPS custody: POST /tracking/location, GET current|history, WebSocket /tracking, geofence worker, 35 tests 100% cobertura |
 | Notifications | ✅ Completo | Sprint 5: NotificationService + INotificationChannel + BullMQ worker + circuit breaker |
 | Scheduler | ✅ Completo | Sprint 6: cron cada minuto, SCHEDULED state, recordatorios 24h/1h/15m |
+| Custody Scheduler | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, 15 tests 100% cobertura, ADR-019 |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
 | Mobile App | ✅ Completo | Sprint 14+16 ✅ · vertical UX extensible (ADR-046) · título dinámico por vertical · 117 tests |
 | Panel Web | ✅ Completo | Sprint 11 ✅ · AdminLayout + 6 páginas · título dinámico desde vertical config |
@@ -37,6 +38,28 @@
 ---
 
 ## Próximas Tareas — Orden Recomendado
+
+### Sprint 9 SistemaCustodias — módulo custody-scheduler ✅ COMPLETO (2026-05-14)
+```
+[x] SCHED-CUST-001: módulo custody-scheduler completo
+    [x] custody-scheduler.repository.ts — getOrdersNeedingReminders (FOR UPDATE SKIP LOCKED), getUnassignedOpenOrders, markReminderSent
+    [x] custody-scheduler.service.ts — cron cada minuto, scanUpcomingReminders + scanDispatchAlerts
+    [x] business-error.ts: ORDER_NOT_IN_DRAFT_STATUS (409), SCHEDULED_AT_TOO_SOON (422), INVALID_PICKUP_WINDOW (422)
+    [x] custody-orders.types.ts: CustodyOrderDTO extendido con pickupWindowStart + pickupWindowEnd
+    [x] custody-orders.repository.ts: +updateSchedule()
+    [x] custody-orders.service.ts: +scheduleOrder() + unscheduleOrder()
+    [x] custody-orders.controller.ts: +schedule() + unschedule()
+    [x] custody-orders.routes.ts: PATCH /:id/schedule + DELETE /:id/schedule
+    [x] migración M-053: tabla custody_scheduled_reminders (ya existía)
+    [x] jest.config.ts: custody-scheduler.repository.ts excluido de cobertura unitaria
+[x] SCHED-CUST-QA-001: 15 tests — custody-scheduler.service.test.ts
+    [x] CustodySchedulerService: 100% lines / 100% branches ✅
+    [x] Casos: reminders happy path, múltiples tipos, sin órdenes, dedup-first, enqueue fallo no-fatal,
+        dispatch alerts happy path, dispatch sin órdenes, tick() callback, tick() error swallow,
+        start/stop lifecycle
+[x] ADR-019: cron + FOR UPDATE SKIP LOCKED + custody_scheduled_reminders (dedup idempotente)
+[x] TypeScript: 0 errores
+```
 
 ### Sprint 8 SistemaCustodias — módulo custody-payments ✅ COMPLETO (2026-05-14)
 ```

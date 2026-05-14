@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 9 PENDIENTE — módulo scheduler (órdenes programadas, ventanas de despacho)
+**Sprint:** 10 PENDIENTE — módulo `compliance` (cadena de custodia, firmas digitales, regulatorio) O `admin` (dashboard despachador/supervisor)
 **Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [SCHEDULER]
-**Objetivo:** Próxima sesión: implementar el módulo scheduler para órdenes de custodia programadas
+**Tipo de contexto:** [COMPLIANCE] o [ADMIN]
+**Objetivo:** Próxima sesión: definir con el usuario cuál es el siguiente sprint prioritario
 
 ---
 
@@ -126,6 +126,19 @@
 - 34 tests, 0 errores TypeScript
 - geofence worker refactorizado (severity corregida: geofence_violation = medium)
 - ADR-016 documentado
+
+---
+
+## Sprint 9 — COMPLETO ✅ (2026-05-14)
+
+**Resultado:** Módulo custody-scheduler implementado y aprobado. 15 tests, 100% cobertura.
+
+**Entregables:**
+- CustodySchedulerService: cron cada minuto, `scanUpcomingReminders` (24h/1h/15m) + `scanDispatchAlerts`
+- `custody_scheduled_reminders` table (M-053) con UNIQUE constraint para deduplicación
+- `PATCH /orders/:id/schedule` + `DELETE /orders/:id/schedule` en custody-orders
+- Nuevos business errors: ORDER_NOT_IN_DRAFT_STATUS, SCHEDULED_AT_TOO_SOON, INVALID_PICKUP_WINDOW
+- ADR-019 documentado
 
 ---
 

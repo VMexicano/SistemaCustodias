@@ -117,6 +117,8 @@ import { CustodyPaymentsController } from './modules/custody-payments/custody-pa
 import { custodyPaymentsRoutes } from './modules/custody-payments/custody-payments.routes.js';
 import { initCustodyPaymentsQueue, custodyPaymentsQueue } from './queues/custody-payments.queue.js';
 import { registerCustodyPaymentWorker } from './workers/custody-payment-worker.js';
+import { CustodySchedulerRepository } from './modules/custody-scheduler/custody-scheduler.repository.js';
+import { CustodySchedulerService } from './modules/custody-scheduler/custody-scheduler.service.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -502,6 +504,18 @@ export async function buildApp() {
   const custodyPaymentService = new CustodyPaymentService(custodyPaymentsRepo, paymentGateway, db);
   const custodyPaymentsController = new CustodyPaymentsController(custodyPaymentService);
   registerCustodyPaymentWorker(redis, custodyPaymentService);
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — custody-scheduler module (Sprint 9)
+  // ---------------------------------------------------------------------------
+
+  const custodySchedulerRepo = new CustodySchedulerRepository(db);
+  const custodySchedulerService = new CustodySchedulerService(
+    db,
+    custodySchedulerRepo,
+    custodyNotificationsQueue,
+  );
+  custodySchedulerService.start();
 
   // Register orders routes now that both notification and payment queues are initialized
   await app.register(ordersRoutes, {

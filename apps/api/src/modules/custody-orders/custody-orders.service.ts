@@ -33,6 +33,8 @@ function toDTO(o: CustodyOrder): CustodyOrderDTO {
     pickupAddress: o.pickup_address,
     deliveryAddress: o.delivery_address,
     scheduledAt: o.scheduled_at?.toISOString() ?? null,
+    pickupWindowStart: o.pickup_window_start?.toISOString() ?? null,
+    pickupWindowEnd: o.pickup_window_end?.toISOString() ?? null,
     custodioId: o.custodio_id,
     copilotoId: o.copiloto_id,
     custodioConfirmedAt: o.custodio_confirmed_at?.toISOString() ?? null,
@@ -407,5 +409,63 @@ export class CustodyOrdersService {
 
   async markDeliveryFailed(orderId: string, actor: Actor, notes: string): Promise<CustodyOrderDTO> {
     return this.executeTransition(orderId, 'DELIVERY_FAILED', actor, {}, { notes });
+  }
+
+  // -------------------------------------------------------------------------
+  // Scheduling (Sprint 9)
+  // -------------------------------------------------------------------------
+
+  async scheduleOrder(
+    orderId: string,
+    _actor: Actor,
+    dto: {
+      scheduledAt: string;
+      pickupWindowStart?: string;
+      pickupWindowEnd?: string;
+    },
+  ): Promise<CustodyOrderDTO> {
+    const order = await this.repo.findById(orderId);
+    if (!order) throw new BusinessError('ORDER_NOT_FOUND', 'Order not found');
+    if (order.status !== 'DRAFT') {
+      throw new BusinessError('ORDER_NOT_IN_DRAFT_STATUS', 'Only DRAFT orders can be scheduled');
+    }
+
+    const scheduledAt = new Date(dto.scheduledAt);
+    const minFuture = new Date(Date.now() + 30 * 60 * 1000);
+    if (scheduledAt < minFuture) {
+      throw new BusinessError('SCHEDULED_AT_TOO_SOON', 'Scheduled time must be at least 30 minutes in the future');
+    }
+
+    if (dto.pickupWindowStart && dto.pickupWindowEnd) {
+      const windowStart = new Date(dto.pickupWindowStart);
+      const windowEnd = new Date(dto.pickupWindowEnd);
+      if (windowEnd <= windowStart) {
+        throw new BusinessError('INVALID_PICKUP_WINDOW', 'pickup_window_end must be after pickup_window_start');
+      }
+    }
+
+    const updated = await this.repo.updateSchedule(orderId, {
+      scheduled_at: scheduledAt,
+      pickup_window_start: dto.pickupWindowStart ? new Date(dto.pickupWindowStart) : null,
+      pickup_window_end: dto.pickupWindowEnd ? new Date(dto.pickupWindowEnd) : null,
+    });
+
+    return toDTO(updated);
+  }
+
+  async unscheduleOrder(orderId: string, _actor: Actor): Promise<CustodyOrderDTO> {
+    const order = await this.repo.findById(orderId);
+    if (!order) throw new BusinessError('ORDER_NOT_FOUND', 'Order not found');
+    if (order.status !== 'DRAFT') {
+      throw new BusinessError('ORDER_NOT_IN_DRAFT_STATUS', 'Only DRAFT orders can be unscheduled');
+    }
+
+    const updated = await this.repo.updateSchedule(orderId, {
+      scheduled_at: null,
+      pickup_window_start: null,
+      pickup_window_end: null,
+    });
+
+    return toDTO(updated);
   }
 }

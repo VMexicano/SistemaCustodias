@@ -213,4 +213,21 @@ export class CustodyOrdersController {
     const { notes } = request.body as { notes: string };
     return reply.send(await this.service.markDeliveryFailed(id, this.actor(request), notes));
   }
+
+  async schedule(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+    const body = request.body as {
+      scheduledAt: string;
+      pickupWindowStart?: string;
+      pickupWindowEnd?: string;
+    };
+    const result = await this.service.scheduleOrder(id, this.actor(request), body);
+    return reply.send(result);
+  }
+
+  async unschedule(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+    const result = await this.service.unscheduleOrder(id, this.actor(request));
+    return reply.send(result);
+  }
 }
