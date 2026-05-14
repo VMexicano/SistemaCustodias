@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 2 completado. Módulos clients + operadores + vehicles activos.
+> Última actualización: 2026-05-14 — Sprint 3 completado. Módulo custody-orders activo con CustodyStateMachine (100% cobertura).
 
 ---
 
@@ -56,7 +56,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 01 | `auth` | ✅ Sprint 1 | OTP, JWT con `tenant_id` + `role`, 5 roles custodia, TenantMiddleware |
 | 02 | `clients` | ✅ Sprint 2 | CRUD clientes — POST/GET/PATCH/DELETE + GET /me |
 | 03 | `operadores` | ✅ Sprint 2 | CRUD operadores — disponibilidad, suspensión, estado |
-| 04 | `custody-orders` | ⬜ Pendiente | State machine completo de la orden de custodia |
+| 04 | `custody-orders` | ✅ Sprint 3 | State machine 18 estados, 20 endpoints, snapshots, audit log |
 | 05 | `value-declaration` | ⬜ Pendiente | Declaración de valores — schema dinámico por tipo |
 | 06 | `routing` | ⬜ Pendiente | Planeación y validación de rutas seguras |
 | 07 | `tracking` | ⬜ Pendiente | GPS tiempo real — TimescaleDB + WebSocket |

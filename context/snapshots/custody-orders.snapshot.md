@@ -1,6 +1,21 @@
 # Snapshot: custody-orders
 > Módulo más crítico. State machine + aprobación + asignación de equipo.
-> Última actualización: 2026-05-13 — Sprint 0
+> Última actualización: 2026-05-14 — Sprint 3 ✅ COMPLETADO
+
+## Estado de implementación
+
+| Artefacto | Estado | Cobertura |
+|---|---|---|
+| `custody-orders.types.ts` | ✅ | — |
+| `custody-state-machine.ts` | ✅ | **100%** (63/63 tests) |
+| `custody-orders.repository.ts` | ✅ | — |
+| `custody-orders.service.ts` | ✅ | — |
+| `custody-orders.controller.ts` | ✅ | — |
+| `custody-orders.routes.ts` | ✅ | 20 rutas registradas |
+| `custody-orders.service.test.ts` | ✅ | 29 casos |
+| `custody-state-machine.test.ts` | ✅ | 63 casos |
+
+Registrado en `app.ts` como `app.register(ordersRoutes, { prefix: '/orders', ordersService })`
 
 ---
 

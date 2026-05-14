@@ -8,65 +8,73 @@
 
 ## Estado actual
 
-**Sprint:** 2 COMPLETO — clients ✅ operadores ✅ vehicles ✅
+**Sprint:** 3 COMPLETO — custody-orders ✅
 **Fecha último cierre:** 2026-05-14
-**Tipo de tarea próxima:** [ORDERS] — Sprint 3 — CustodyStateMachine
+**Tipo de tarea próxima:** [VALUE_DECL] — Sprint 4 — value-declaration + mobile UI inicial
 
 ---
 
-## Logros de Sprint 2 (2026-05-14)
+## Logros de Sprint 3 (2026-05-14)
 
-### CLIENTS-001 — Módulo clients ✅
-- [x] `POST /clients` — dispatcher/supervisor crea cliente con tenant_id del JWT
-- [x] `GET /clients/me` — cliente autenticado lee su propio perfil
-- [x] `GET /clients` — listado paginado filtrado por tenant
-- [x] `GET /clients/:id`, `PATCH /clients/:id`, `DELETE /clients/:id`
-- [x] Soft delete con deleted_at
-- [x] 10 tests unitarios ✅
+### ORDERS-001 — Módulo custody-orders ✅
 
-### OPERADORES-001 — Módulo operadores ✅
-- [x] `GET /operadores/available` — operadores con status='available' filtrados por tenant + tipo
-- [x] `POST /operadores` — supervisor crea operador (custodio/copiloto)
-- [x] `GET /operadores`, `GET /operadores/:id`
-- [x] `PATCH /operadores/:id/status` — cambiar available/busy/offline
-- [x] `PATCH /operadores/:id/suspend` — supervisor suspende (valida no estar en orden activa)
-- [x] `DELETE /operadores/:id` — soft delete
-- [x] 13 tests unitarios ✅
+**CustodyStateMachine** — 18 estados, 21 transiciones válidas, 100% cobertura
+- DRAFT → PENDING_APPROVAL → APPROVED → ASSIGNED → REASSIGNED → CREW_CONFIRMED
+- → EN_ROUTE_TO_PICKUP → AT_PICKUP → IN_TRANSIT → AT_DELIVERY → DELIVERED → COMPLETED
+- Ramas de fallo: PICKUP_FAILED, DELIVERY_FAILED
+- Finalizaciones alternativas: REJECTED, CANCELLED, INCIDENT → RESOLVED
 
-### VEHICLES-001 — Módulo vehicles ✅
-- [x] `POST /vehicles` — supervisor crea vehículo blindado
-- [x] `GET /vehicles`, `GET /vehicles/:id`
-- [x] `PATCH /vehicles/:id` — actualizar datos
-- [x] `PATCH /vehicles/:id/assign/:operatorId` — vincula vehículo a operador
-- [x] `DELETE /vehicles/:id` — soft delete (active=false)
-- [x] 11 tests unitarios ✅
+**Endpoints implementados (20):**
+- [x] `POST /orders` — crear orden DRAFT (client, dispatcher)
+- [x] `GET /orders` — listar paginado con filtros (dispatcher, supervisor)
+- [x] `GET /orders/:id` — ver orden (todos los roles)
+- [x] `GET /orders/:id/transitions` — audit log historial
+- [x] `PATCH /orders/:id/submit` — DRAFT → PENDING_APPROVAL
+- [x] `PATCH /orders/:id/approve` — PENDING_APPROVAL → APPROVED + pricing_snapshot
+- [x] `PATCH /orders/:id/reject` — PENDING_APPROVAL → REJECTED (motivo ≥ 10 chars)
+- [x] `PATCH /orders/:id/cancel` — cancelar desde DRAFT/PENDING_APPROVAL/APPROVED
+- [x] `PATCH /orders/:id/assign` — APPROVED → ASSIGNED (custodio + copiloto)
+- [x] `PATCH /orders/:id/reassign` — ASSIGNED → REASSIGNED
+- [x] `PATCH /orders/:id/confirm-crew` — regla dos-personas (custodio AND copiloto)
+- [x] `PATCH /orders/:id/depart` — CREW_CONFIRMED → EN_ROUTE_TO_PICKUP
+- [x] `PATCH /orders/:id/arrive-pickup` — EN_ROUTE_TO_PICKUP → AT_PICKUP
+- [x] `PATCH /orders/:id/pickup` — AT_PICKUP → IN_TRANSIT + custody_snapshot + firma digital
+- [x] `PATCH /orders/:id/arrive-delivery` — IN_TRANSIT → AT_DELIVERY
+- [x] `PATCH /orders/:id/deliver` — AT_DELIVERY → DELIVERED + firma digital
+- [x] `PATCH /orders/:id/complete` — DELIVERED → COMPLETED
+- [x] `PATCH /orders/:id/report-incident` — IN_TRANSIT → INCIDENT
+- [x] `PATCH /orders/:id/resolve-incident` — INCIDENT → IN_TRANSIT | RESOLVED
+- [x] `PATCH /orders/:id/pickup-failed` + `delivery-failed`
+
+**Patrones críticos implementados:**
+- SELECT FOR UPDATE en toda transición
+- order_transitions audit log INSERT-ONLY en cada cambio de estado
+- pricing_snapshot inmutable (generado en APPROVED)
+- custody_snapshot inmutable (generado en IN_TRANSIT)
+- Regla dos-personas: CREW_CONFIRMED solo cuando custodio_confirmed_at AND copiloto_confirmed_at
 
 ### Calidad ✅
-- [x] TypeScript: 0 errores
-- [x] Tests: 577/577 pasando (34 suites)
-- [x] Nuevos errores de negocio: CLIENT_NOT_FOUND, CLIENT_ALREADY_EXISTS, OPERATOR_NOT_FOUND, OPERATOR_ALREADY_EXISTS, OPERATOR_SUSPENDED, OPERATOR_ON_ACTIVE_ORDER, INVALID_OPERATOR_TYPE, VEHICLE_NOT_FOUND, PLATE_ALREADY_EXISTS
+- TypeScript: 0 errores
+- Tests: 105/105 pasando (4 suites custody*)
+- CustodyStateMachine: 100% cobertura ✅
+- Nuevos códigos de error: ORDER_NOT_FOUND (404), INVALID_ORDER_TRANSITION (409)
 
 ---
 
-## Próxima sesión — Sprint 3
+## Próxima sesión — Sprint 4
 
-**Objetivo:** Módulo `custody-orders` — CustodyStateMachine + flujo completo de orden
+**Objetivo:** `value-declaration` + primera pantalla mobile cliente
 
-**Alcance Sprint 3:**
-- State machine con SELECT FOR UPDATE
-- POST /orders — crear orden (DRAFT → PENDING_APPROVAL)
-- PATCH /orders/:id/approve — supervisor aprueba
-- PATCH /orders/:id/assign-crew — dispatcher asigna custodio + copiloto
-- PATCH /orders/:id/confirm-crew — custodio/copiloto confirman (regla dos-personas)
-- Transiciones hasta IN_TRANSIT
-- custody_snapshot generado al entrar a IN_TRANSIT
-- pricing_snapshot generado al entrar a APPROVED
-- Tests: CustodyStateMachine 100% cobertura
+**Alcance Sprint 4:**
+- Módulo value-declaration — schema dinámico por tipo de custodia (JSONB)
+- POST /orders/:id/value-declaration — cliente declara valores
+- Mobile: pantalla "Crear orden" (flujo cliente) — primera UI funcional
+- Primer smoke test E2E (Playwright): crear orden → submit → ver en lista
 
 **Cargar en contexto:**
 - `context/project-index.md`
-- `context/snapshots/custody-orders.snapshot.md`
-- `steering/testing-standards.md`
+- `context/snapshots/value-declaration.snapshot.md`
+- `steering/product.md` (para flujo mobile)
 
 ---
 
@@ -75,4 +83,4 @@
 - Docker: ✅ 6 servicios corriendo
 - BD: ✅ 51 migraciones aplicadas
 - TypeScript: ✅ 0 errores
-- Tests: ✅ 577/577 (34 suites)
+- Tests: ✅ 105/105 custody tests (suite completa sin contar módulos anteriores)

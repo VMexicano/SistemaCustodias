@@ -90,6 +90,9 @@ import { operadoresRoutes } from './modules/operadores/operadores.routes.js';
 import { VehiclesRepository as CustodyVehiclesRepository } from './modules/vehicles/vehicles.repository.js';
 import { VehiclesService as CustodyVehiclesService } from './modules/vehicles/vehicles.service.js';
 import { vehiclesRoutes } from './modules/vehicles/vehicles.routes.js';
+import { CustodyOrdersRepository } from './modules/custody-orders/custody-orders.repository.js';
+import { CustodyOrdersService } from './modules/custody-orders/custody-orders.service.js';
+import { ordersRoutes } from './modules/custody-orders/custody-orders.routes.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -409,6 +412,14 @@ export async function buildApp() {
   const custodyVehiclesRepo = new CustodyVehiclesRepository(db);
   const custodyVehiclesService = new CustodyVehiclesService(custodyVehiclesRepo, operadoresRepo);
   await app.register(vehiclesRoutes, { prefix: '/vehicles', vehiclesService: custodyVehiclesService });
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — custody orders module (Sprint 3)
+  // ---------------------------------------------------------------------------
+
+  const custodyOrdersRepo = new CustodyOrdersRepository(db);
+  const custodyOrdersService = new CustodyOrdersService(custodyOrdersRepo, db);
+  await app.register(ordersRoutes, { prefix: '/orders', ordersService: custodyOrdersService });
 
   // ---------------------------------------------------------------------------
   // Health check endpoint

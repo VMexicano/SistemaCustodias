@@ -74,6 +74,9 @@ export type BusinessErrorCode =
   | 'VALIDATION_ERROR'
   // Custody — multi-tenant
   | 'TENANT_REQUIRED'
+  // Custody Orders
+  | 'ORDER_NOT_FOUND'
+  | 'INVALID_ORDER_TRANSITION'
   // Clients
   | 'CLIENT_NOT_FOUND'
   | 'CLIENT_ALREADY_EXISTS'
@@ -146,6 +149,8 @@ const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   FORBIDDEN: 403,
   VALIDATION_ERROR: 422,
   TENANT_REQUIRED: 403,
+  ORDER_NOT_FOUND: 404,
+  INVALID_ORDER_TRANSITION: 409,
   CLIENT_NOT_FOUND: 404,
   CLIENT_ALREADY_EXISTS: 409,
   OPERATOR_NOT_FOUND: 404,
