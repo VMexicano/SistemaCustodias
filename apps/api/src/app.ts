@@ -102,6 +102,9 @@ import { CustodyTrackingService } from './modules/custody-tracking/custody-track
 import { custodyTrackingRoutes } from './modules/custody-tracking/custody-tracking.routes.js';
 import { initGeofenceQueue, geofenceQueue } from './queues/geofence.queue.js';
 import { registerGeofenceWorker } from './workers/geofence-check.worker.js';
+import { AlertsRepository } from './modules/alerts/alerts.repository.js';
+import { AlertEngine } from './modules/alerts/alert-engine.js';
+import { alertsRoutes, orderAlertsRoutes } from './modules/alerts/alerts.routes.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -458,7 +461,17 @@ export async function buildApp() {
     prefix: '/tracking',
     custodyTrackingService,
   });
-  registerGeofenceWorker(db, redis);
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — alerts module (Sprint 6)
+  // ---------------------------------------------------------------------------
+
+  const alertsRepo = new AlertsRepository(db);
+  const alertEngine = new AlertEngine(alertsRepo, db, custodyOrdersService);
+  await app.register(alertsRoutes, { prefix: '/alerts', alertEngine, alertsRepo, db });
+  await app.register(orderAlertsRoutes, { prefix: '/orders', alertEngine, alertsRepo, db });
+
+  registerGeofenceWorker(db, redis, alertEngine);
 
   // ---------------------------------------------------------------------------
   // Health check endpoint

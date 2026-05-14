@@ -1,6 +1,18 @@
 # Snapshot: alerts
 > Sistema de alertas de seguridad — botón de pánico, tamper, geofence, incidentes.
-> Última actualización: 2026-05-13 — Sprint 0
+> Última actualización: 2026-05-14 — Sprint 6 ✅ COMPLETO
+
+---
+
+## Estado de cobertura — Sprint 6
+
+| Archivo | Lines | Branches | Funciones | Statements |
+|---|---|---|---|---|
+| `alert-engine.ts` | **100%** | **100%** | **100%** | **100%** |
+
+Umbrales requeridos: Lines ≥ 95%, Branches ≥ 90% → **APROBADO**
+
+Tests: 34 tests, 34 pasando · Suites: 1/1
 
 ---
 
@@ -12,7 +24,7 @@ apps/api/src/modules/alerts/
   alerts.controller.ts
   alerts.service.ts
   alerts.repository.ts
-  alert-engine.ts         ← 95% cobertura obligatoria
+  alert-engine.ts         ← 100% cobertura ✅
   alerts.types.ts
 ```
 

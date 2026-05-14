@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 5 EN CURSO — tracking GPS + WebSocket + TimescaleDB
+**Sprint:** 7 PENDIENTE — módulo notifications (FCM push + SMS fallback + circuit breaker)
 **Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [TRACKING]
-**Objetivo:** Implementación completa del módulo tracking (backend + tests + snapshot)
+**Tipo de contexto:** [NOTIFICATIONS]
+**Objetivo:** Próxima sesión: implementar el módulo notifications para alertas critical/high
 
 ---
 
@@ -103,14 +103,26 @@
 
 ---
 
-## Próxima sesión — Sprint 6
+## Sprint 6 — COMPLETO ✅ (2026-05-14)
 
-**Objetivo:** Módulo `alerts` — AlertEngine (botón de pánico, tamper, geofence full integration, 95% cobertura)
+**Resultado:** Módulo alerts implementado y aprobado. AlertEngine 100% cobertura (umbral ≥95%).
+
+**Entregables:**
+- AlertEngine: panic→INCIDENT, dedup 30s, severity map, supervisor-only critical
+- 34 tests, 0 errores TypeScript
+- geofence worker refactorizado (severity corregida: geofence_violation = medium)
+- ADR-016 documentado
+
+---
+
+## Próxima sesión — Sprint 7
+
+**Objetivo:** Módulo `notifications` — FCM push + SMS fallback + circuit breaker para alertas critical/high
 
 **Cargar en contexto:**
-- `context/snapshots/alerts.snapshot.md` (principal)
-- `context/snapshots/custody-orders.snapshot.md` (secundario — estados activos)
-- `steering/testing-standards.md` (AlertEngine umbral 95%)
+- `context/snapshots/notifications.snapshot.md` (principal)
+- `context/snapshots/alerts.snapshot.md` (secundario — alerts disparan notificaciones)
+- `steering/coding-standards.md`
 
 ---
 

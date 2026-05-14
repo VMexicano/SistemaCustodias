@@ -1,337 +1,217 @@
-# Sprint 6 — Design
+# Sprint 6 — Design: Módulo Alerts
 
-## Arquitectura al finalizar Sprint 6
-
-```
-apps/
-  api/
-    src/
-      modules/
-        scheduler/          ← NUEVO
-          scheduler.service.ts
-          scheduler.repository.ts
-        scheduled-trips/    ← NUEVO
-          scheduled-trips.controller.ts
-          scheduled-trips.service.ts
-          scheduled-trips.repository.ts
-          scheduled-trips.routes.ts
-        admin/              ← NUEVO
-          admin.controller.ts
-          admin.service.ts
-          admin.repository.ts
-          admin.routes.ts
-          admin.middleware.ts
-  web/                      ← REEMPLAZADO (Next.js → Vite 5 + React 19)
-    index.html
-    vite.config.ts
-    src/
-      main.tsx
-      App.tsx
-      pages/
-        LoginPage.tsx
-        DashboardPage.tsx
-        ConfigPage.tsx
-      components/
-        StatsCard.tsx
-        TripsTable.tsx
-        ErrorsTable.tsx
-        PricingForm.tsx
-      lib/
-        api.ts              ← fetch wrapper con cookie auth
-        auth.ts             ← guard / redirect logic
-```
+**Sprint:** 6 — SistemaCustodias
+**Fecha:** 2026-05-14
 
 ---
 
-## Componentes clave
+## Arquitectura del módulo
 
-### SchedulerService
+```
+apps/api/src/modules/alerts/
+  alerts.types.ts
+  alerts.repository.ts
+  alert-engine.ts        ← lógica central — 95% cobertura obligatoria
+  alerts.controller.ts
+  alerts.routes.ts
+
+apps/api/src/workers/
+  geofence-check.worker.ts  ← REFACTORIZAR para usar AlertEngine
+```
+
+### Dependencias del AlertEngine
 
 ```typescript
-class SchedulerService {
+class AlertEngine {
   constructor(
-    private readonly schedulerRepo: SchedulerRepository,
-    private readonly tripsService: TripsService,
-    private readonly notificationQueue: NotificationQueue
+    private repo: AlertsRepository,
+    private db: Knex,
+    private ordersService: CustodyOrdersService,  // para panic → INCIDENT
   ) {}
-
-  // Llamado por node-cron cada minuto
-  async tick(): Promise<void>
-
-  // Activa viajes cuyo scheduled_for <= NOW()
-  private async activateDueTrips(): Promise<void>
-
-  // Envía recordatorios pendientes (24h, 1h, 15m)
-  private async sendReminders(): Promise<void>
 }
-```
-
-**Pattern:** SELECT FOR UPDATE en scheduled_trips para evitar doble activación.
-
-### TripStateMachine — nueva transición
-
-```
-SCHEDULED → REQUESTED  (activado por scheduler)
-SCHEDULED → CANCELLED  (cancelado por pasajero vía DELETE /trips/scheduled/:id)
-```
-
-Nueva entrada en el grafo de transiciones válidas:
-```typescript
-{ from: 'SCHEDULED', to: 'REQUESTED', actor: 'system' }
-{ from: 'SCHEDULED', to: 'CANCELLED', actor: 'passenger' }
-```
-
-### AdminMiddleware
-
-```typescript
-// apps/api/src/modules/admin/admin.middleware.ts
-export async function adminOnly(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  if (!request.user?.roles.includes('admin')) {
-    throw reply.code(403).send({ code: 'FORBIDDEN', message: 'Admin role required' });
-  }
-}
-```
-
-Usado como `preHandler: [authenticate, adminOnly]` en todas las rutas `/admin/*`.
-
----
-
-## Contratos de API
-
-### Scheduler / Viajes programados
-
-#### POST /trips/schedule
-```typescript
-// Request
-interface ScheduleTripBody {
-  origin: { lat: number; lng: number; address: string };
-  destination: { lat: number; lng: number; address: string };
-  tripTypeId: string;
-  scheduledFor: string; // ISO 8601 — mínimo 30 min en el futuro
-}
-
-// Response 201
-interface ScheduleTripResponse {
-  tripId: string;
-  status: 'SCHEDULED';
-  scheduledFor: string;
-  estimatedFare: number;
-}
-
-// Errores
-// 400 SCHEDULED_TOO_SOON     — scheduledFor < NOW + 30min
-// 409 PASSENGER_HAS_ACTIVE_TRIP
-```
-
-#### GET /trips/scheduled
-```typescript
-// Response 200
-interface ScheduledTripsResponse {
-  trips: Array<{
-    tripId: string;
-    scheduledFor: string;
-    origin: string;
-    destination: string;
-    estimatedFare: number;
-    tripType: string;
-  }>;
-}
-```
-
-#### DELETE /trips/scheduled/:tripId
-```typescript
-// Response 204 — No content
-// Errores
-// 404 TRIP_NOT_FOUND
-// 403 FORBIDDEN (no es viaje del pasajero)
-// 409 TRIP_NOT_SCHEDULED (ya fue activado)
 ```
 
 ---
 
-### Admin — Monitoreo
+## Contrato de API
 
-#### GET /admin/stats
-```typescript
-// Response 200
-interface AdminStatsResponse {
-  activeTrips: number;
-  onlineDrivers: number;
-  todayRevenueMXN: number;
-  pendingErrors: number;
-}
+### POST /alerts
+
 ```
+Auth: JWT — onRequest: [authenticate, authorize('custodio', 'copiloto'), tenantGuard]
 
-#### GET /admin/trips?status=&page=&limit=
-```typescript
-// Query params: status?: string, page?: number (default 1), limit?: number (default 20)
-// Response 200
-interface AdminTripsResponse {
-  data: Array<{
-    id: string; passengerId: string; driverId: string | null;
-    status: string; originAddress: string; destinationAddress: string;
-    finalFare: number | null; createdAt: string;
-  }>;
-  total: number; page: number; limit: number;
-}
-```
-
-#### GET /admin/drivers?status=&page=
-```typescript
-// Response 200
-interface AdminDriversResponse {
-  data: Array<{
-    id: string; userId: string; fullName: string;
-    status: string; online: boolean; ratingAvg: number | null;
-  }>;
-  total: number; page: number; limit: number;
-}
-```
-
-#### GET /admin/errors?resolved=
-```typescript
-// Query: resolved?: 'true' | 'false' (default false)
-// Response 200
-interface AdminErrorsResponse {
-  data: Array<{
-    id: string; errorCode: string; message: string;
-    context: Record<string, unknown>; createdAt: string; resolvedAt: string | null;
-  }>;
-}
-```
-
-#### PATCH /admin/errors/:id/resolve
-```typescript
-// Response 200
-interface ResolveErrorResponse { id: string; resolvedAt: string; }
-// Errores: 404 ERROR_NOT_FOUND, 409 ERROR_ALREADY_RESOLVED
-```
-
----
-
-### Admin — Configuración
-
-#### GET /admin/pricing/factors
-```typescript
-// Response 200
-interface AdminFactorsResponse {
-  factors: Array<{
-    id: string; code: string; name: string;
-    type: string; value: number; active: boolean; priority: number;
-  }>;
-}
-```
-
-#### PATCH /admin/pricing/factors/:id
-```typescript
-// Request (todos opcionales)
-interface UpdateFactorBody { active?: boolean; value?: number; }
-// Response 200 — factor actualizado completo
-// Errores: 404 FACTOR_NOT_FOUND
-```
-
-#### GET /admin/commissions
-```typescript
-// Response 200
-interface AdminCommissionsResponse {
-  commissions: Array<{
-    id: string; regionId: string; platformFeePct: number; active: boolean;
-  }>;
-}
-```
-
-#### PATCH /admin/commissions/:id
-```typescript
-// Request
-interface UpdateCommissionBody { platformFeePct: number; } // 0-100
-// Response 200 — commission actualizada
-// Errores: 404 COMMISSION_NOT_FOUND, 400 INVALID_FEE_PCT
-```
-
-#### GET /admin/trip-types
-```typescript
-// Response 200
-interface AdminTripTypesResponse {
-  tripTypes: Array<{
-    id: string; code: string; name: string; serviceMode: string;
-    baseFare: number; costPerKm: number; costPerMin: number; minFare: number;
-  }>;
-}
-```
-
-#### PATCH /admin/trip-types/:id
-```typescript
-// Request (todos opcionales)
-interface UpdateTripTypeBody {
-  baseFare?: number; costPerKm?: number; costPerMin?: number; minFare?: number;
-}
-// Response 200 — trip type actualizado
-// Errores: 404 TRIP_TYPE_NOT_FOUND
-```
-
----
-
-## Setup Vite 5 + React 19 (WEB-001)
-
-```typescript
-// vite.config.ts
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-  server: { port: 3002 },
-  build: { outDir: 'dist' }
-})
-```
-
-**Dependencias a instalar:**
-```json
+Body:
 {
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@tanstack/react-router": "^1.x",
-    "@tanstack/react-query": "^5.x",
-    "tailwindcss": "^3.x"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.x",
-    "vite": "^5.x",
-    "@types/react": "^19.x",
-    "@types/react-dom": "^19.x"
-  }
+  order_id:     string (minLength: 1)
+  alert_type:   'panic' | 'tamper' | 'geofence_violation' | 'communication_loss' | 'custom'
+  location?:    { lat: number, lng: number }
+  description?: string (maxLength: 2000)
 }
+
+Response 201:
+{
+  id: string, order_id: string, operator_id: string,
+  alert_type: string, severity: string,
+  location: {lat, lng} | null, description: string | null,
+  resolved_at: null, created_at: string
+}
+
+Errors:
+  400 VALIDATION_ERROR
+  403 OPERATOR_NOT_ASSIGNED
+  404 ORDER_NOT_FOUND
+  409 ORDER_NOT_ACTIVE_FOR_ALERT
+  409 PANIC_ALERT_TOO_SOON
 ```
 
-**Auth en SPA:** JWT almacenado en memoria (variable de módulo en `lib/auth.ts`) + refresh desde cookie httpOnly. El login llama `POST /auth/login` y guarda el access token en memoria; el middleware de rutas verifica su presencia.
+### GET /alerts
 
-**Turbo pipeline (sin cambios):**
-```json
-// turbo.json — dev y build ya apuntan a scripts del package.json
-// apps/web/package.json scripts se mantienen: dev, build, type-check
+```
+Auth: JWT — dispatcher, supervisor
+Query: order_id?: string, resolved?: 'true'|'false', limit?: number (max 200, default 50)
+Response 200: { alerts: SecurityAlert[], count: number }
+```
+
+### GET /alerts/:id
+
+```
+Auth: JWT — dispatcher, supervisor
+Response 200: SecurityAlert
+Errors: 404 ALERT_NOT_FOUND
+```
+
+### PATCH /alerts/:id/resolve
+
+```
+Auth: JWT — supervisor
+Body: { notes?: string }
+Response 200: SecurityAlert (con resolved_at y resolved_by)
+Errors:
+  404 ALERT_NOT_FOUND
+  409 ALERT_ALREADY_RESOLVED
+  403 ONLY_SUPERVISOR_CAN_RESOLVE_CRITICAL  (si severity=critical y role≠supervisor)
+```
+
+### GET /orders/:id/alerts
+
+```
+Auth: JWT — dispatcher, supervisor
+Response 200: { order_id: string, alerts: SecurityAlert[], count: number }
+Errors: 404 ORDER_NOT_FOUND
 ```
 
 ---
 
-## ADRs aplicables
+## AlertEngine — lógica central
 
-| ADR | Decisión |
-|---|---|
-| ADR-008 | SELECT FOR UPDATE en transiciones de estado — aplica a SCHEDULED → REQUESTED |
-| ADR-014 | SDD/TDD antes de implementar |
-| ADR-024 | WebSocket /passenger /driver — el scheduler emite via getIO() igual que trips.service |
-| ADR-025 | TripStateMachine: lock en service caller |
-| ADR-028 | INotificationChannel — recordatorios via NotificationQueue existente |
-| **ADR-029** | Scheduler: node-cron cada minuto en proceso principal (MVP monolito) |
-| **ADR-030** | Admin panel: Vite 5 + React 19 + TanStack Router/Query + Tailwind |
+```typescript
+const ALERTABLE_STATUSES = new Set([
+  'EN_ROUTE_TO_PICKUP', 'AT_PICKUP', 'IN_TRANSIT',
+  'AT_DELIVERY', 'INCIDENT'
+]);
+
+const SEVERITY_MAP: Record<AlertType, Severity> = {
+  panic:               'critical',
+  tamper:              'high',
+  geofence_violation:  'medium',
+  communication_loss:  'high',
+  custom:              'low',
+};
+
+const PANIC_DEDUP_SECONDS = 30;
+
+async validateOrderForAlert(orderId: string, operatorId: string): Promise<CustodyOrder>
+  // 1. SELECT custody_orders WHERE id = orderId AND deleted_at IS NULL
+  // 2. Si no existe → ORDER_NOT_FOUND
+  // 3. Si status NOT IN ALERTABLE_STATUSES → ORDER_NOT_ACTIVE_FOR_ALERT
+  // 4. Si custodio_id ≠ operatorId AND copiloto_id ≠ operatorId → OPERATOR_NOT_ASSIGNED
+  // 5. return order
+
+async createAlert(payload: CreateAlertPayload, userId: string, operatorId: string): Promise<SecurityAlert>
+  // 1. validateOrderForAlert(order_id, operatorId)
+  // 2. Si alert_type = 'panic':
+  //    a. Verificar dedup: SELECT WHERE order_id=? AND operator_id=? AND alert_type='panic'
+  //                                AND created_at > NOW() - INTERVAL '30 seconds'
+  //    b. Si existe → PANIC_ALERT_TOO_SOON
+  //    c. Determinar severity = SEVERITY_MAP[alert_type]
+  // 3. INSERT en security_alerts (via repo.create())
+  // 4. Si alert_type = 'panic':
+  //    → ordersService.reportIncident(order_id, { userId, role: 'custodio' }, description)
+  //    (fuera de transacción — side effect)
+  // 5. return alert
+
+async resolveAlert(alertId: string, resolverUserId: string, resolverRole: string): Promise<SecurityAlert>
+  // 1. findById(alertId) → ALERT_NOT_FOUND si no existe
+  // 2. Si alert.resolved_at ≠ null → ALERT_ALREADY_RESOLVED
+  // 3. Si alert.severity = 'critical' AND resolverRole ≠ 'supervisor' → ONLY_SUPERVISOR_CAN_RESOLVE_CRITICAL
+  // 4. UPDATE security_alerts SET resolved_at=NOW(), resolved_by=resolverUserId WHERE id=alertId
+  // 5. return updated alert
+```
 
 ---
 
-## Variables de entorno nuevas
+## Tabla security_alerts — Knex patterns
 
-```bash
-# Ninguna nueva requerida para el backend (scheduler usa DB/Redis existentes)
-# El panel web consume VITE_API_URL (opcional, default http://localhost:3333)
-VITE_API_URL=http://localhost:3333
+```typescript
+// INSERT — usar Knex query builder (no raw, no TimescaleDB needed)
+const [alert] = await db('security_alerts')
+  .insert({
+    order_id, operator_id, alert_type, severity,
+    location: location ? db.raw('POINT(?, ?)', [location.lng, location.lat]) : null,
+    description: description ?? null,
+    created_at: new Date(),
+  })
+  .returning('*');
+
+// SELECT con filtros opcionales
+const rows = await db('security_alerts')
+  .where({ order_id })
+  .modify((qb) => {
+    if (resolved === false) qb.whereNull('resolved_at');
+    if (resolved === true) qb.whereNotNull('resolved_at');
+  })
+  .orderBy('created_at', 'desc')
+  .limit(limit);
 ```
+
+**PUNTO DE DATOS IMPORTANTE:** La columna `location` es tipo `POINT` en PostgreSQL. Al leerla desde Knex, el driver pg devuelve una string en formato `(lng,lat)`. Al insertarla, usar `db.raw('POINT(?, ?)', [lng, lat])`. En el response HTTP, convertir a `{ lat, lng }` con un parser.
+
+---
+
+## Refactor geofence-check.worker.ts
+
+El worker actual inserta directo en `security_alerts`. Debe ser refactorizado para llamar a `AlertEngine`:
+
+```typescript
+// ANTES (eliminar):
+await db.raw(`INSERT INTO security_alerts ...`);
+
+// DESPUÉS:
+await alertEngine.createAlert(
+  { order_id, alert_type: 'geofence_violation', location: { lat, lng } },
+  operator_id,  // userId del operador (o usar operator_id como proxy)
+  operator_id,
+);
+```
+
+El `AlertEngine` se instancia en `app.ts` y se pasa al worker via `registerGeofenceWorker(db, redis, alertEngine)`.
+
+---
+
+## Nuevos BusinessErrorCodes
+
+```typescript
+| 'ALERT_NOT_FOUND'                    // 404
+| 'ALERT_ALREADY_RESOLVED'             // 409
+| 'PANIC_ALERT_TOO_SOON'               // 409
+| 'ORDER_NOT_ACTIVE_FOR_ALERT'         // 409
+| 'ONLY_SUPERVISOR_CAN_RESOLVE_CRITICAL' // 403
+```
+
+---
+
+## ADR-016 — AlertEngine como autoridad central para creación de alertas
+
+**Decisión:** Cualquier módulo que necesite crear una alerta (geofence worker, futuros timers, módulos de compliance) debe llamar a `AlertEngine.createAlert()`. Nunca INSERT directo en `security_alerts`.
+
+**Razón:** Centraliza la lógica de severidad, deduplicación, side effects (panic → INCIDENT) y futura integración con notifications. El geofence worker del Sprint 5 se refactoriza como deuda técnica.

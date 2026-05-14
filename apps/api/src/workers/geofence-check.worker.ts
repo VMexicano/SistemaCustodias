@@ -7,6 +7,7 @@ import type { Redis } from 'ioredis';
 import type { Knex } from 'knex';
 import { isOutsideRoute, type Point } from '../modules/custody-tracking/geofence.utils.js';
 import type { GeofenceCheckJobData } from '../queues/geofence.queue.js';
+import type { AlertEngine } from '../modules/alerts/alert-engine.js';
 
 const QUEUE_NAME = 'geofence-check';
 const GEOFENCE_THRESHOLD_METERS = 500;
@@ -22,7 +23,11 @@ interface OrderRow {
  * Register the geofence check worker.
  * Called once from app.ts after initGeofenceQueue().
  */
-export function registerGeofenceWorker(db: Knex, redis: Redis): Worker<GeofenceCheckJobData> {
+export function registerGeofenceWorker(
+  db: Knex,
+  redis: Redis,
+  alertEngine: AlertEngine,
+): Worker<GeofenceCheckJobData> {
   const connection = redis.duplicate({ maxRetriesPerRequest: null });
 
   const worker = new Worker<GeofenceCheckJobData>(
@@ -71,7 +76,8 @@ export function registerGeofenceWorker(db: Knex, redis: Redis): Worker<GeofenceC
         return;
       }
 
-      // 4. Deduplicate alerts — only insert if no alert in the last 60 seconds
+      // 4. Deduplicate alerts via AlertEngine (uses repo.countRecentPanic for panic;
+      //    geofence has its own cooldown check via raw SQL before calling engine)
       const countResult = await db.raw<{ rows: Array<{ count: string }> }>(
         `SELECT COUNT(*) AS count
          FROM security_alerts
@@ -87,17 +93,17 @@ export function registerGeofenceWorker(db: Knex, redis: Redis): Worker<GeofenceC
         return;
       }
 
-      // 5. Insert the geofence violation alert
-      await db.raw(
-        `INSERT INTO security_alerts
-           (order_id, operator_id, alert_type, severity, location, description)
-         VALUES (?, ?, 'geofence_violation', 'high', ?, ?)`,
-        [
+      // 5. Create the alert through AlertEngine
+      //    For the worker, operator_id is used as userId proxy (no real user session)
+      await alertEngine.createAlert(
+        {
           order_id,
-          operator_id,
-          JSON.stringify({ lat, lng }),
-          `Operator deviated more than ${GEOFENCE_THRESHOLD_METERS}m from the planned route`,
-        ],
+          alert_type: 'geofence_violation',
+          location: { lat, lng },
+          description: `Operator deviated more than ${GEOFENCE_THRESHOLD_METERS}m from planned route`,
+        },
+        operator_id, // userId proxy — no JWT in worker context
+        operator_id, // operator_id
       );
     },
     { connection },

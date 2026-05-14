@@ -285,6 +285,31 @@ El `CustodyTrackingService` necesita hacer broadcast via Socket.io (`io.to(room)
 
 ---
 
+## ADR-016: AlertEngine como autoridad central para creación de alertas
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+En Sprint 5 el `geofence-check.worker.ts` insertaba directamente en `security_alerts` con un INSERT raw. Se necesitaba centralizar la lógica de severidad, deduplicación de pánico (30s), side effect `panic→INCIDENT` y futura integración con notifications.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| INSERT directo desde cada caller | Simple en el momento | Duplicación de lógica de severidad, dedup repartida en múltiples lugares |
+| AlertEngine (clase de dominio) | Única fuente de verdad para creación de alertas | Acoplamiento del worker al service layer |
+| Event bus interno | Desacoplado | Sobre-ingeniería para MVP |
+
+**Decisión:** `AlertEngine` es la única vía válida para crear alertas. Cualquier módulo que necesite insertar en `security_alerts` (geofence worker, futuros timers, compliance) debe llamar `AlertEngine.createAlert()`. Nunca INSERT directo.
+
+**Consecuencias:**
+- El geofence worker de Sprint 5 se refactorizó en Sprint 6 para recibir `alertEngine` como parámetro
+- La severidad de `geofence_violation` se corrigió de `high` a `medium` (SEVERITY_MAP canónico en AlertEngine)
+- `registerGeofenceWorker(db, redis, alertEngine?)` — alertEngine es opcional para retrocompatibilidad de tests
+- Toda cobertura del flujo de alertas reside en `alert-engine.test.ts` (100% lines/branches)
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown

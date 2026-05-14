@@ -38,6 +38,27 @@
 
 ## Próximas Tareas — Orden Recomendado
 
+### Sprint 6 SistemaCustodias — módulo alerts ✅ COMPLETO (2026-05-14)
+```
+[x] ALERTS-001: módulo alerts completo
+    [x] alerts.types.ts — AlertType, Severity, SecurityAlert, CreateAlertPayload
+    [x] alerts.repository.ts — create, findById, findAll, findByOrderId, resolve, countRecentPanic
+    [x] alert-engine.ts — validateOrderForAlert, createAlert (dedup panic 30s), resolveAlert (supervisor-only critical)
+    [x] alerts.controller.ts
+    [x] alerts.routes.ts (POST /alerts, GET /alerts, GET /alerts/:id, PATCH /alerts/:id/resolve, GET /orders/:id/alerts)
+    [x] business-error.ts: ALERT_NOT_FOUND, ALERT_ALREADY_RESOLVED, PANIC_ALERT_TOO_SOON, ORDER_NOT_ACTIVE_FOR_ALERT, ONLY_SUPERVISOR_CAN_RESOLVE_CRITICAL
+    [x] geofence-check.worker.ts refactorizado → usa AlertEngine (severity geofence_violation corregida: high→medium)
+    [x] app.ts wiring — AlertEngine + alertsRoutes + registerGeofenceWorker con alertEngine
+[x] ALERTS-QA-001: 34 tests — alert-engine.test.ts
+    [x] AlertEngine: 100% lines / 100% branches (umbral: ≥95% / ≥90%) ✅
+    [x] validateOrderForAlert: 8 tests — ORDER_NOT_FOUND, ORDER_NOT_ACTIVE_FOR_ALERT, OPERATOR_NOT_ASSIGNED, todos los ALERTABLE_STATUSES
+    [x] createAlert: 8 tests — panic flow, dedup, severity map it.each, location, reportIncident non-fatal
+    [x] resolveAlert: 8 tests — NOT_FOUND, ALREADY_RESOLVED, supervisor-only critical, roles no-críticos
+    [x] BusinessError codes: 5 tests
+[x] ADR-016: AlertEngine como autoridad central (geofence worker refactorizado)
+[x] TypeScript: 0 errores
+```
+
 ### Sprint 5 SistemaCustodias — custody-tracking GPS ✅ COMPLETO (2026-05-14)
 ```
 [x] TRACK-001: módulo custody-tracking completo
