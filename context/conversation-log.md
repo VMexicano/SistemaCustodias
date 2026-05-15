@@ -8,6 +8,49 @@
 
 ## Sesiones
 
+### [2026-05-15] — Debug setup mobile: AddressPickerField + fix roles + fix Android MapboxGL
+
+**Agentes usados:** ninguno (sesión de implementación directa)
+**Módulos tocados:** mobile (LoginScreen, NewCustodyOrderScreen, CustodyActiveOrderScreen, custody.store, auth.store), componente AddressPickerField
+**Tipo de contexto:** [MOBILE]
+
+#### Qué se hizo
+
+- **Fix crítico LoginScreen**: el mapeo de rol en `handleVerifyOtp` siempre resolvía a `'driver'` o `'passenger'` — los actores custodio/copiloto/client nunca llegaban a su stack correcto. Se agregó `resolveRole(roles[])` con prioridad custodio > copiloto > client > dispatcher > supervisor > driver > passenger
+- **Panel DEV extendido**: panel de acceso rápido ahora tiene 7 actores (cliente 0099, supervisor 0098, dispatcher 0097, custodio 0096, copiloto 0095, pasajero 0001, conductor 0002) con color por rol y scroll horizontal
+- **UserRole ampliado**: `auth.store.ts` agrega `dispatcher | supervisor` al tipo union (necesarios para el panel DEV y acceso web)
+- **Reactotron instrumentado**: `tlog`/`tlogError` en `CustodyActiveOrderScreen` — loguea carga de orden, carga de ruta, y cada transición de estado (inicio + éxito + error)
+- **AddressPickerField** (`src/components/`): componente nuevo reutilizable con: autocomplete Mapbox debounceado 380ms + biased por GPS, botón GPS (expo-location + reverseGeocode), modal mapa full-screen con crosshair pan-to-select, parseo de `place_name` en `{street, city, state, lat, lng}`, hint de coordenadas visible tras selección
+- **NewCustodyOrderScreen refactorizado**: reemplaza 6 `TextInput` independientes por 2 `AddressPickerField`, envía `lat/lng` al API (ya aceptados por `addressSchema`), botón Continuar deshabilitado hasta que ambas direcciones tengan `street`
+- **custody.store.ts**: `AddressValue { street, city, state, lat?, lng? }` reemplaza los 6 campos planos `pickup/deliveryStreet/City/State`
+- **Fix bug Android Modal + MapboxGL**: cuando dos `AddressPickerField` están en pantalla, sus `MapboxGL.MapView` coexistían en el árbol nativo (Android no desmonta hijos de Modal cuando `visible=false`). `onRegionDidChange` de un mapa contaminaba el `mapCenterRef` del otro → ambos campos resolvían las mismas coordenadas. Fix: `{mapVisible && <MapboxGL.MapView>}` dentro del Modal + `animationDuration={0}` en Camera
+
+#### Estado resultante
+
+| Módulo | Estado antes | Estado después |
+|---|---|---|
+| Mobile LoginScreen | Bug: todos los roles → passenger/driver | ✅ Roles custody mapeados correctamente |
+| Mobile NewCustodyOrderScreen | 6 TextInput sin coordenadas | ✅ AddressPickerField × 2 con lat/lng |
+| Mobile AddressPickerField | No existía | ✅ Autocomplete + GPS + mapa |
+| custody.store | Campos planos sin coordenadas | ✅ AddressValue con lat/lng |
+| Reactotron | Solo configurado | ✅ Instrumentado en pantallas clave |
+
+#### Decisiones tomadas
+
+- **Android Modal + MapboxGL**: siempre usar `{modalVisible && <MapboxGL.MapView>}` dentro de un `Modal` para evitar doble instancia nativa. Esto aplica a cualquier componente que use MapboxGL dentro de un Modal en este proyecto.
+- **resolveRole prioridad**: custodio > copiloto > client > dispatcher > supervisor > driver > passenger — el primer rol de mayor prioridad gana (un usuario puede tener múltiples roles en el array)
+- `animationDuration={0}` en `MapboxGL.Camera` dentro de modales: evita re-animaciones en re-renders que disparan `onRegionDidChange` espurios
+
+#### Próximo paso
+
+Debug end-to-end: correr el flujo completo con los actores de seed (cliente crea orden → dispatcher aprueba y asigna → custodio+copiloto confirman → transiciones hasta DELIVERED). Verificar con Reactotron que los logs sean correctos en cada transición.
+
+#### Bloqueos
+
+Ninguno. TypeScript: 0 errores. No se corrieron tests en esta sesión (cambios fueron de UI/UX).
+
+---
+
 ### [2026-05-14] — Sprint 3 + Sprint 4: custody-orders completo + value-declaration + CustodyClientStack mobile
 
 **Agentes usados:** orchestrator, planner, architect, backend, mobile, qa

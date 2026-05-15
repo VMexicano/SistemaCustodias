@@ -1,6 +1,6 @@
 # Snapshot: mobile
 > App React Native — dos flujos en una app: cliente y operador (custodio/copiloto).
-> Última actualización: 2026-05-13 — Sprint 0
+> Última actualización: 2026-05-15 — Sprint 14 + debug setup + AddressPickerField
 
 ---
 
@@ -141,6 +141,41 @@ Durante IN_TRANSIT el operador ve:
 
 ---
 
+## Estado actual de implementación (2026-05-15)
+
+### ✅ Implementado y funcionando
+
+**Flujo cliente:**
+- `LoginScreen` — OTP por teléfono, panel DEV con 7 actores (0095-0099 + 0001-0002), rol correctamente mapeado desde array `roles` de la API
+- `SelectCustodyTypeScreen` — fetches /custody-types
+- `NewCustodyOrderScreen` — `AddressPickerField` × 2 (autocomplete Mapbox + GPS + mapa)
+- `ValueDeclarationScreen` — form dinámico desde JSON Schema
+
+**Flujo operador (custodio/copiloto):**
+- `CustodyOperatorHomeScreen` — lista de órdenes activas vía GET /orders/my
+- `CustodyActiveOrderScreen` — mapa Mapbox, transiciones de estado, firma digital, botón pánico
+- `CustodyOperatorStack` — navegación completa
+
+**Infraestructura:**
+- `RootNavigator` — ruteo por rol: client→CustodyClientStack, custodio|copiloto→CustodyOperatorStack
+- `auth.store.ts` — UserRole: passenger | driver | client | custodio | copiloto | dispatcher | supervisor
+- `custody.store.ts` — AddressValue con lat/lng, NewOrderDraft sin campos planos
+- `reactotron.ts` — tlog/tlogError instrumentación, port 9091, nombre "Custodia de Valores"
+- `AddressPickerField` — componente reutilizable en `src/components/`
+
+### ⚠️ Bugs conocidos / pendientes
+
+- MapboxGL: token real necesario para producción (ENV.mapboxToken)
+- GPS background tracking en `CustodyActiveOrderScreen`: implementado pero sin prueba en dispositivo físico
+- Firma digital: actualmente TextInput de texto plano — falta canvas real (sprint futuro)
+- Push notifications: `NotificationService` wired pero FCM token no probado end-to-end
+
+### Tests (2026-05-15)
+- 14 tests operator screens (CustodyOperatorScreens.test.tsx) — 14/14 ✅
+- TypeScript: 0 errores
+
+---
+
 ## Reglas críticas de mobile
 
 1. El botón de pánico está disponible **siempre** durante una orden activa — nunca lo escondas
@@ -149,6 +184,7 @@ Durante IN_TRANSIT el operador ve:
 4. Si el WebSocket se desconecta, el app sigue funcionando con polling HTTP cada 30s
 5. Las acciones optimistas muestran feedback inmediato antes de la respuesta del API
 6. Toda pantalla del flujo operador muestra el estado de la orden en un header persistente
+7. **Modal + MapboxGL en Android**: siempre usar `{mapVisible && <MapboxGL.MapView>}` dentro de un Modal — sin esto, dos MapView coexisten en el árbol nativo y los eventos `onRegionDidChange` se contaminan entre instancias
 
 ---
 
@@ -160,3 +196,4 @@ Durante IN_TRANSIT el operador ve:
 - `alerts` — Botón de pánico → POST /alerts
 - `notifications` — Recepción de push notifications
 - `value-declaration` — Formulario de nueva orden
+- `geocoding.service` — Mapbox searchPlaces + reverseGeocode para AddressPickerField

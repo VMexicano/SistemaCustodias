@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 14 COMPLETO ✅ — UI de routing: web admin + mobile operador
-**Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [ORDERS] / [MOBILE]
-**Objetivo:** Sprint 14 completado. Sección de ruta en CustodyOrderDetailPage (web), CustodyOperatorStack con Home+ActiveOrder screens (mobile), GET /orders/my endpoint para custodio/copiloto, 14 tests mobile, TypeScript 0 errores.
+**Sprint:** 14 COMPLETO ✅ + Debug mobile
+**Fecha de sesión:** 2026-05-15
+**Tipo de contexto:** [MOBILE]
+**Objetivo:** Debug setup + AddressPickerField con Mapbox autocomplete/GPS/mapa, fix bug mapeo de roles, fix doble MapboxGL en Android. TypeScript 0 errores.
 
 ---
 
@@ -221,14 +221,18 @@
 
 ---
 
-## Próxima sesión — Sprint 12
+## Próxima sesión
 
-**Objetivo:** Asignación de equipo desde UI (PATCH /orders/:id/assign) + opcional mapa Mapbox
+**Objetivo:** Debug E2E completo — flujo cliente crea orden → dispatcher aprueba/asigna → custodio+copiloto confirman → transiciones hasta DELIVERED. Verificar con Reactotron. Si surge algún problema de API, corregirlo.
 
 **Cargar en contexto:**
-- `context/snapshots/admin.snapshot.md` (principal)
-- `steering/product.md` (actores y flujos)
-- `steering/coding-standards.md`
+- `context/snapshots/mobile.snapshot.md` (principal)
+- `context/snapshots/custody-orders.snapshot.md` (para referencia de transiciones)
+
+**Pendientes conocidos:**
+- Firma digital como TextInput plano — canvas real es trabajo futuro
+- GPS background tracking en CustodyActiveOrderScreen no probado en dispositivo físico
+- FCM push notifications no validado end-to-end
 
 ---
 
