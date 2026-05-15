@@ -133,6 +133,7 @@ export interface OrderTransitionDTO {
 
 export interface CreateOrderInput {
   clientId: string;
+  actorUserId: string;
   custodyTypeId: string;
   tenantId: string;
   pickupAddress: Address;

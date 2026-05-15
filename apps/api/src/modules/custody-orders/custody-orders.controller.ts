@@ -56,6 +56,7 @@ export class CustodyOrdersController {
     };
     const order = await this.service.create({
       ...body,
+      actorUserId: request.user!.sub,
       tenantId: request.user!.tenant_id!,
       pickupAddress: body.pickupAddress as any,
       deliveryAddress: body.deliveryAddress as any,

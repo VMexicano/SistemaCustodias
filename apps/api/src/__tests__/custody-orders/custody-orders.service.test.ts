@@ -76,15 +76,19 @@ const makeRepo = (overrides: Partial<CustodyOrdersRepository> = {}): CustodyOrde
     ...overrides,
   }) as unknown as CustodyOrdersRepository;
 
-// Make a DB mock with transaction support
-const makeDb = (): Database => {
-  const trx = {
-    // trx is passed to repo methods; mock repo already ignores it
+// Make a DB mock with transaction support and clients table lookup
+const makeDb = (resolvedClientId = 'client-uuid'): Database => {
+  const trx = {};
+  const clientChain = {
+    where: jest.fn().mockReturnThis(),
+    whereNull: jest.fn().mockReturnThis(),
+    first: jest.fn().mockResolvedValue({ id: resolvedClientId }),
   };
-  const mockDb = {
-    transaction: jest.fn().mockImplementation((cb: (trx: unknown) => Promise<unknown>) => cb(trx)),
-  };
-  return mockDb as unknown as Database;
+  const fn = jest.fn().mockReturnValue(clientChain) as unknown as Database;
+  (fn as unknown as Record<string, unknown>).transaction = jest.fn().mockImplementation(
+    (cb: (trx: unknown) => Promise<unknown>) => cb(trx),
+  );
+  return fn;
 };
 
 const actor = { userId: 'user-uuid', role: 'supervisor' };
@@ -101,6 +105,7 @@ describe('CustodyOrdersService', () => {
 
       const result = await service.create({
         clientId: 'client-uuid',
+        actorUserId: 'user-uuid',
         custodyTypeId: 'type-uuid',
         tenantId: 'tenant-uuid',
         pickupAddress: { street: 'Av. 1', city: 'CDMX', state: 'CDMX' },

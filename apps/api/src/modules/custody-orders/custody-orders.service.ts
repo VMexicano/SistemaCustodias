@@ -65,9 +65,15 @@ export class CustodyOrdersService {
   // -------------------------------------------------------------------------
 
   async create(input: CreateOrderInput): Promise<CustodyOrderDTO> {
+    const clientRow = await this.db('clients')
+      .where({ user_id: input.actorUserId })
+      .whereNull('deleted_at')
+      .first() as { id: string } | undefined;
+    if (!clientRow) throw new BusinessError('CLIENT_NOT_FOUND', 'Caller has no client profile');
+
     const order = await this.repo.create({
       orderNumber: generateOrderNumber(),
-      clientId: input.clientId,
+      clientId: clientRow.id,
       custodyTypeId: input.custodyTypeId,
       tenantId: input.tenantId,
       pickupAddress: input.pickupAddress,
