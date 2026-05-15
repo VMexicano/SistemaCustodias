@@ -186,6 +186,10 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 5 Custodias] Campos NULLABLE en response types (speed_kmh: number|null, heading: number|null): el spec debe listar explícitamente tests para "campo null → retorna null, no undefined ni 0" — son branches silenciosos que la cobertura detecta tarde
 ✓ [Sprint 5 Custodias] Socket.io namespace en módulos nuevos: declarar en el spec si el io se inyecta en el constructor o via setIo() post-construcción, y qué pasa si io es undefined en entorno de test (debe no lanzar, solo no emitir)
 ✓ [Sprint 5 Custodias] Workers BullMQ que escriben directamente a tablas de módulos no-implementados: documentar en scope_out que es una dependencia temporal y debe refactorizarse cuando el módulo dueño (ej: alerts) se implemente
+✓ [Sprint 11 Custodias] TanStack Router Link tipado: usar `to="/admin/path/$param" params={{ param: value }}` en lugar de template literals — los template literals fallan el type check aunque el valor sea correcto
+✓ [Sprint 11 Custodias] TanStack Router useParams: preferir `useParams({ strict: false }) as { id: string }` para páginas de detalle — evita que el `from` literal quede obsoleto si el path cambia
+✓ [Sprint 11 Custodias] Sidebar multi-sección: usar array de NavSection con `title?: string` en lugar de flat NavItem[] cuando hay más de un grupo — el collapsed mode reemplaza el title con un divisor visual
+✓ [Sprint 11 Custodias] Sprints frontend sin backend: verificar explícitamente qué endpoints ya existen (alerts.routes.ts, custody-orders.routes.ts) antes de planear — puede ahorrar todo un sprint de backend
 ```
 
 ### Checklist de completitud por tarea — campos adicionales (Sprint 4+)

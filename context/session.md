@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 11 PENDIENTE — módulo `admin` (dashboard despachador/supervisor)
+**Sprint:** 12 PENDIENTE — asignación de equipo + mapa en tiempo real (web admin)
 **Fecha de sesión:** 2026-05-14
 **Tipo de contexto:** [ADMIN]
-**Objetivo:** Próxima sesión: implementar dashboard admin (web) con vistas de dispatcher y supervisor
+**Objetivo:** Sprint 11 completado. Próxima sesión: asignación de custodio/copiloto desde UI + opcional: mapa Mapbox tracking
 
 ---
 
@@ -181,9 +181,30 @@
 
 ---
 
-## Próxima sesión — Sprint 11
+## Logros de Sprint 11 (2026-05-14)
 
-**Objetivo:** Módulo `admin` — dashboard despachador/supervisor (web)
+### ADMIN-WEB — Dashboard web custodia ✅
+
+**Páginas implementadas (4):**
+- `CustodyOrdersPage` `/admin/custody/orders` — listado paginado con filtro estado + búsqueda
+- `CustodyOrderDetailPage` `/admin/custody/orders/$id` — detalle + timeline + alertas + PDF + aprobar/rechazar
+- `CustodyApprovalsPage` `/admin/custody/approvals` — cola supervisor (auto-refresh 30s)
+- `CustodyAlertsPage` `/admin/custody/alerts` — activas/resueltas + resolver (auto-refresh 15s)
+
+**Infraestructura:**
+- `api.getBlob()` para descarga PDF cadena de custodia
+- Sidebar refactorizado con `NavSection[]` — sección "CUSTODIA" visible/colapsable
+- 4 rutas nuevas en `main.tsx`
+
+**Calidad:**
+- TypeScript: 0 errores (web + api)
+- Sin tests unitarios (web app sin Jest — UI verificada por inspección + compilación)
+
+---
+
+## Próxima sesión — Sprint 12
+
+**Objetivo:** Asignación de equipo desde UI (PATCH /orders/:id/assign) + opcional mapa Mapbox
 
 **Cargar en contexto:**
 - `context/snapshots/admin.snapshot.md` (principal)

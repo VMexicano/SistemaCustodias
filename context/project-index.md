@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 10 completado. Módulo compliance activo: GET /orders/:id/chain-of-custody + GET /orders/:id/chain-of-custody/pdf + GET /orders/:id/signatures, SHA-256 integridad, pdfkit, 28 tests 100% cobertura service, ADR-020.
+> Última actualización: 2026-05-14 — Sprint 11 completado. Módulo admin web: 4 páginas custody (/admin/custody/orders, /admin/custody/orders/$id, /admin/custody/approvals, /admin/custody/alerts), Sidebar sección Custodia, api.getBlob(), TypeScript 0 errores.
 
 ---
 
@@ -64,7 +64,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 09 | `custody-notifications` | ✅ Sprint 7 | FCM push + SMS fallback + CircuitBreaker Redis (threshold 5/60s), routing 12 estados, 44 tests |
 | 10 | `payments` | ✅ Sprint 8 | Cobro automático Stripe post-COMPLETED, BullMQ worker, idempotencia, GET /orders/:id/payment |
 | 11 | `custody-scheduler` | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, cron + FOR UPDATE SKIP LOCKED |
-| 12 | `admin` | ⬜ Pendiente | Dashboard despachador/supervisor |
+| 12 | `admin` | ✅ Sprint 11 | Dashboard web: CustodyOrdersPage, CustodyOrderDetailPage, CustodyApprovalsPage, CustodyAlertsPage |
 | 13 | `compliance` | ✅ Sprint 10 | Cadena de custodia, firmas digitales, reportes auditables + PDF, SHA-256, 28 tests |
 
 ## Migraciones aplicadas

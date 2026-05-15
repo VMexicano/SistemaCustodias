@@ -28,6 +28,7 @@
 | Scheduler | ✅ Completo | Sprint 6: cron cada minuto, SCHEDULED state, recordatorios 24h/1h/15m |
 | Custody Scheduler | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, 15 tests 100% cobertura, ADR-019 |
 | Compliance | ✅ Sprint 10 | Cadena de custodia JSON + PDF + firmas, SHA-256, redacción por rol, 28 tests 100% cobertura, ADR-020 |
+| Admin Web Custody | ✅ Sprint 11 | 4 páginas custody: CustodyOrdersPage, CustodyOrderDetailPage, CustodyApprovalsPage, CustodyAlertsPage. api.getBlob(), Sidebar sección Custodia, 0 errores TS |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
 | Mobile App | ✅ Completo | Sprint 14+16 ✅ · vertical UX extensible (ADR-046) · título dinámico por vertical · 117 tests |
 | Panel Web | ✅ Completo | Sprint 11 ✅ · AdminLayout + 6 páginas · título dinámico desde vertical config |
@@ -39,6 +40,35 @@
 ---
 
 ## Próximas Tareas — Orden Recomendado
+
+### Sprint 11 SistemaCustodias — módulo admin web ✅ COMPLETO (2026-05-14)
+```
+[x] ADMIN-WEB-001: Infraestructura web
+    [x] api.getBlob() — descarga binaria para PDF cadena de custodia
+    [x] Sidebar.tsx refactorizado — NavSection[] multi-sección con sección "CUSTODIA"
+    [x] main.tsx — 4 rutas nuevas /admin/custody/*
+[x] ADMIN-WEB-002: CustodyOrdersPage (/admin/custody/orders)
+    [x] Listado paginado (LIMIT 20), filtro por estado, búsqueda local por order_number
+    [x] Tabla: order_number, status badge, origen, destino, programada, creada, link Ver
+    [x] Paginación anterior/siguiente
+[x] ADMIN-WEB-003: CustodyOrderDetailPage (/admin/custody/orders/$id)
+    [x] Header: order_number, status badge, acciones (aprobar/rechazar si PENDING_APPROVAL, descargar PDF)
+    [x] Cards: Ruta (pickup+delivery), Pricing snapshot, Equipo, Detalles
+    [x] Timeline transiciones: from→to, actor_role, timestamp, notas, badge firmado
+    [x] Alertas de la orden: severity badge, tipo, descripción, activa/resuelta
+    [x] Modal rechazo: reason mínimo 10 chars
+[x] ADMIN-WEB-004: CustodyApprovalsPage (/admin/custody/approvals)
+    [x] Cola PENDING_APPROVAL (auto-refresh 30s)
+    [x] Cards por orden: rutas, programada, notas + botones Aprobar/Rechazar
+    [x] Modal rechazo con validación
+[x] ADMIN-WEB-005: CustodyAlertsPage (/admin/custody/alerts)
+    [x] Tabs Activas (auto-refresh 15s) / Resueltas
+    [x] Filtro por severidad
+    [x] Badges severidad coloreados, highlight rojo para critical
+    [x] Botón Resolver por alerta activa
+    [x] Summary críticas/altas en header
+[x] TypeScript: 0 errores (web + api)
+```
 
 ### Sprint 10 SistemaCustodias — módulo compliance ✅ COMPLETO (2026-05-14)
 ```

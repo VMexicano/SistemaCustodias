@@ -1,84 +1,90 @@
 # Snapshot: admin
 > Dashboard web — despachador y supervisor.
-> Última actualización: 2026-05-13 — Sprint 0
+> Última actualización: 2026-05-14 — Sprint 11 completado
 
 ---
+
+## Estado: ✅ Sprint 11 completo
 
 ## Stack web
 
 - Vite 5 + React 19 + TanStack Router
 - TanStack Query para fetching
 - Tailwind CSS
-- Socket.io-client para tiempo real
+- Socket.io-client para tiempo real (pendiente Sprint 12+)
 
 ---
 
-## Páginas principales
+## Páginas implementadas (Sprint 11)
 
 ```
-apps/web/src/pages/
-  DashboardPage.tsx          (resumen: órdenes activas, alertas, mapa)
-  OrdersPage.tsx             (listado de órdenes con filtros)
-  OrderDetailPage.tsx        (detalle + historial de transiciones + firmas)
-  PendingApprovalsPage.tsx   (órdenes esperando aprobación del supervisor)
-  OperadoresPage.tsx         (gestión de custodios y copilotos)
-  ClientsPage.tsx            (gestión de clientes)
-  AlertsPage.tsx             (alertas activas y resueltas)
-  ConfigPage.tsx             (tipos de custodia, precios, config del sistema)
-  ReportsPage.tsx            (cadena de custodia, reportes regulatorios)
+apps/web/src/pages/custody/
+  CustodyOrdersPage.tsx         ✅ Listado paginado con filtros (estado, búsqueda)
+  CustodyOrderDetailPage.tsx    ✅ Detalle + timeline transiciones + alertas + PDF download + aprobar/rechazar
+  CustodyApprovalsPage.tsx      ✅ Cola PENDING_APPROVAL — aprobar + rechazar modal (auto-refresh 30s)
+  CustodyAlertsPage.tsx         ✅ Activas/Resueltas tabs + filtro severidad + resolver (auto-refresh 15s)
+```
+
+## Infraestructura modificada
+
+- `apps/web/src/lib/api.ts` — `api.getBlob(path)` para descargar PDF
+- `apps/web/src/components/layout/Sidebar.tsx` — sección "CUSTODIA" con NavSection[] multi-sección
+- `apps/web/src/main.tsx` — 4 nuevas rutas: `/admin/custody/orders`, `/admin/custody/orders/$id`, `/admin/custody/approvals`, `/admin/custody/alerts`
+
+---
+
+## Rutas registradas
+
+| Ruta | Componente | Acceso |
+|---|---|---|
+| `/admin/custody/orders` | CustodyOrdersPage | dispatcher, supervisor |
+| `/admin/custody/orders/$id` | CustodyOrderDetailPage | dispatcher, supervisor |
+| `/admin/custody/approvals` | CustodyApprovalsPage | supervisor |
+| `/admin/custody/alerts` | CustodyAlertsPage | dispatcher, supervisor |
+
+---
+
+## API consumida
+
+| Endpoint | Página |
+|---|---|
+| `GET /orders?status=X&page=N&limit=20` | CustodyOrdersPage |
+| `GET /orders/:id` | CustodyOrderDetailPage |
+| `GET /orders/:id/transitions` | CustodyOrderDetailPage (timeline) |
+| `GET /orders/:orderId/alerts` | CustodyOrderDetailPage |
+| `GET /orders/:id/chain-of-custody/pdf` | CustodyOrderDetailPage (blob download) |
+| `PATCH /orders/:id/approve` | CustodyOrderDetailPage + CustodyApprovalsPage |
+| `PATCH /orders/:id/reject` | CustodyOrderDetailPage + CustodyApprovalsPage |
+| `GET /orders?status=PENDING_APPROVAL&limit=50` | CustodyApprovalsPage |
+| `GET /alerts?resolved=false` | CustodyAlertsPage (tab activas) |
+| `GET /alerts?resolved=true` | CustodyAlertsPage (tab resueltas) |
+| `PATCH /alerts/:id/resolve` | CustodyAlertsPage |
+
+---
+
+## Patrones de TypeScript TanStack Router
+
+```tsx
+// Link a ruta dinámica — usar params prop
+<Link to="/admin/custody/orders/$id" params={{ id: order.id }}>Ver</Link>
+
+// useParams en página de detalle — strict: false
+const { id } = useParams({ strict: false }) as { id: string };
 ```
 
 ---
 
-## Pantalla crítica: Dashboard
+## Pendiente (Sprint 12+)
 
-El dashboard del despachador/supervisor muestra en tiempo real:
-- Mapa con ubicación de todas las unidades activas
-- Listado de alertas activas (con badge de severidad)
-- Órdenes en PENDING_APPROVAL esperando acción
-- KPIs del día: órdenes completadas, en tránsito, tiempo promedio
-
----
-
-## Flujos principales por actor
-
-### Despachador
-1. Ve órdenes aprobadas → selecciona custodio + copiloto → asigna
-2. Monitorea mapa en tiempo real
-3. Responde a alertas de nivel `medium`
-4. Puede crear órdenes en nombre del cliente
-
-### Supervisor
-1. Ve cola de PENDING_APPROVAL → aprueba o rechaza (con motivo)
-2. Responde a alertas `critical` y `high`
-3. Puede suspender operadores
-4. Descarga reportes de cadena de custodia
-5. Configura tipos de custodia y precios
+- Mapa Mapbox en tiempo real (WebSocket /tracking)
+- Asignación de equipo desde UI (PATCH /orders/:id/assign) — requiere selector de operadores disponibles
+- Gestión de operadores custody (OperadoresPage)
+- Gestión de clientes custody (ClientsPage)
+- Badge en Sidebar de custody alerts (requiere hook de contador)
 
 ---
 
-## WebSocket en dashboard
+## TypeScript
 
-- Se conecta al namespace `/tracking` y recibe eventos `location:updated`
-- Se conecta al namespace `/alerts` y recibe `alert:created`, `alert:resolved`
-- Se conecta al namespace `/orders` y recibe `order:status_changed`
-- Todos los eventos actualizan el estado de React Query sin refetch completo
-
----
-
-## Reglas
-
-1. La PendingApprovalsPage es solo para supervisores — los despachadores no tienen acceso
-2. El mapa en tiempo real usa Mapbox GL JS (no rnmapbox — es la versión web)
-3. No usar `<a href>` para navegación — siempre TanStack Router `<Link>`
-4. Toda acción destructiva (cancelar orden, suspender operador) requiere confirmación modal
-
----
-
-## Dependencias entre módulos
-
-- `custody-orders` — Todas las páginas consumen datos de órdenes
-- `operadores` — OperadoresPage y asignación en OrderDetailPage
-- `alerts` — AlertsPage y dashboard
-- `tracking` — Mapa en tiempo real del dashboard
-- `compliance` — ReportsPage y cadena de custodia
+- 0 errores (web + api)
+- No hay tests unitarios (web app sin Jest setup — UI verificada por inspección)
