@@ -231,25 +231,32 @@ export default function AddressPickerField({ label, value, onChange, testID }: P
 
       <Modal visible={mapVisible} animationType="slide" statusBarTranslucent onRequestClose={() => setMapVisible(false)}>
         <View style={styles.mapContainer}>
-          <MapboxGL.MapView
-            style={styles.mapView}
-            onRegionDidChange={(feature) => {
-              const coords = (feature as unknown as { geometry: { coordinates: [number, number] } })
-                .geometry.coordinates;
-              if (coords) mapCenterRef.current = coords;
-            }}
-          >
-            <MapboxGL.Camera
-              zoomLevel={15}
-              centerCoordinate={mapInitCenter}
-              animationDuration={300}
-            />
-          </MapboxGL.MapView>
+          {/* Renderizado condicional: en Android el Modal mantiene hijos montados
+              aunque visible=false. Sin este guard, dos MapboxGL.MapView coexisten
+              en el árbol y onRegionDidChange de uno contamina el mapCenterRef del otro. */}
+          {mapVisible && (
+            <>
+              <MapboxGL.MapView
+                style={styles.mapView}
+                onRegionDidChange={(feature) => {
+                  const coords = (feature as unknown as { geometry: { coordinates: [number, number] } })
+                    .geometry.coordinates;
+                  if (coords) mapCenterRef.current = coords;
+                }}
+              >
+                <MapboxGL.Camera
+                  zoomLevel={15}
+                  centerCoordinate={mapInitCenter}
+                  animationDuration={0}
+                />
+              </MapboxGL.MapView>
 
-          {/* Crosshair fijo en el centro de la pantalla */}
-          <View style={styles.crosshairWrap} pointerEvents="none">
-            <Text style={styles.crosshairPin}>📍</Text>
-          </View>
+              {/* Crosshair fijo en el centro de la pantalla */}
+              <View style={styles.crosshairWrap} pointerEvents="none">
+                <Text style={styles.crosshairPin}>📍</Text>
+              </View>
+            </>
+          )}
 
           <View style={styles.mapTopBar}>
             <TouchableOpacity
