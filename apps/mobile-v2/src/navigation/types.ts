@@ -51,9 +51,15 @@ export type CustodyClientStackParamList = {
   ValueDeclaration: { orderId: string };
 };
 
+export type CustodyOperatorStackParamList = {
+  CustodyOperatorHome: undefined;
+  CustodyActiveOrder: { orderId: string };
+};
+
 export type RootStackParamList = {
   Login: undefined;
   PassengerStack: undefined;
   DriverStack: undefined;
   CustodyClientStack: undefined;
+  CustodyOperatorStack: undefined;
 };

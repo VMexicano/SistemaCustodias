@@ -6,6 +6,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import PassengerStack from './PassengerStack';
 import DriverStack from './DriverStack';
 import CustodyClientStack from './CustodyClientStack';
+import CustodyOperatorStack from './CustodyOperatorStack';
 import { RootStackParamList } from './types';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -37,6 +38,14 @@ export default function RootNavigator(): React.JSX.Element {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="CustodyClientStack" component={CustodyClientStack} />
+      </Stack.Navigator>
+    );
+  }
+
+  if (role === 'custodio' || role === 'copiloto') {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="CustodyOperatorStack" component={CustodyOperatorStack} />
       </Stack.Navigator>
     );
   }

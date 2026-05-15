@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 13 COMPLETO ✅ — módulo custody-routing
+**Sprint:** 14 COMPLETO ✅ — UI de routing: web admin + mobile operador
 **Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [COMPLIANCE] / [TRACKING]
-**Objetivo:** Sprint 13 completado. Módulo custody-routing implementado y con tests. Migración M-054 pendiente (Docker no activo).
+**Tipo de contexto:** [ORDERS] / [MOBILE]
+**Objetivo:** Sprint 14 completado. Sección de ruta en CustodyOrderDetailPage (web), CustodyOperatorStack con Home+ActiveOrder screens (mobile), GET /orders/my endpoint para custodio/copiloto, 14 tests mobile, TypeScript 0 errores.
 
 ---
 

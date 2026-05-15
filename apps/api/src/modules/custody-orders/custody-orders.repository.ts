@@ -115,6 +115,32 @@ export class CustodyOrdersRepository {
     return row;
   }
 
+  async findActiveForOperator(userId: string, tenantId: string): Promise<CustodyOrder[]> {
+    const ACTIVE_STATUSES: OrderStatus[] = [
+      'ASSIGNED', 'REASSIGNED', 'CREW_CONFIRMED',
+      'EN_ROUTE_TO_PICKUP', 'AT_PICKUP', 'IN_TRANSIT',
+      'AT_DELIVERY', 'INCIDENT',
+    ];
+
+    const opRow = await this.db('operators')
+      .where({ user_id: userId })
+      .whereNull('deleted_at')
+      .select('id')
+      .first() as { id: string } | undefined;
+
+    if (!opRow) return [];
+
+    return this.db<CustodyOrder>('custody_orders')
+      .where({ tenant_id: tenantId })
+      .whereNull('deleted_at')
+      .where(function () {
+        void this.where('custodio_id', opRow.id).orWhere('copiloto_id', opRow.id);
+      })
+      .whereIn('status', ACTIVE_STATUSES)
+      .orderBy('created_at', 'desc')
+      .limit(10);
+  }
+
   async updateStatus(
     id: string,
     status: OrderStatus,

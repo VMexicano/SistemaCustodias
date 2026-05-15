@@ -36,6 +36,13 @@ export class CustodyOrdersController {
       .catch(() => { /* non-fatal */ });
   }
 
+  async getMyOrders(request: FastifyRequest, reply: FastifyReply) {
+    const userId = request.user!.sub;
+    const tenantId = request.user!.tenant_id!;
+    const orders = await this.service.getMyOrders(userId, tenantId);
+    return reply.send({ data: orders });
+  }
+
   async create(request: FastifyRequest, reply: FastifyReply) {
     const body = request.body as {
       clientId: string;

@@ -142,6 +142,12 @@ export async function ordersRoutes(
     handler: ctrl.list.bind(ctrl),
   });
 
+  // Must be registered before /:id to avoid routing conflict
+  app.get('/my', {
+    preHandler: [...preAuth, authorize('custodio', 'copiloto')],
+    handler: ctrl.getMyOrders.bind(ctrl),
+  });
+
   app.get('/:id', {
     preHandler: [...preAuth, authorize('client', 'custodio', 'copiloto', 'dispatcher', 'supervisor')],
     handler: ctrl.getById.bind(ctrl),

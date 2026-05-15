@@ -101,6 +101,11 @@ export class CustodyOrdersService {
     return { data: result.data.map(toDTO), total: result.total };
   }
 
+  async getMyOrders(userId: string, tenantId: string): Promise<CustodyOrderDTO[]> {
+    const orders = await this.repo.findActiveForOperator(userId, tenantId);
+    return orders.map(toDTO);
+  }
+
   async getTransitions(orderId: string): Promise<OrderTransitionDTO[]> {
     const order = await this.repo.findById(orderId);
     if (!order) throw new BusinessError('ORDER_NOT_FOUND', 'Order not found');

@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 13 completado. Módulo custody-routing: POST/GET/PATCH /orders/:id/route, CustodyRoutingService 100% cobertura (22 tests), geofence worker actualizado con ruta planificada, migración M-054 (custody_routes), TypeScript 0 errores.
+> Última actualización: 2026-05-14 — Sprint 14 completado. UI routing: CustodyOperatorStack (mobile) + sección ruta en CustodyOrderDetailPage (web). GET /orders/my para custodio/copiloto. 14 tests mobile. TypeScript 0 errores.
 
 ---
 

@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-14 — Sprint 13 SistemaCustodias: módulo custody-routing completo — POST/GET/PATCH /orders/:id/route, CustodyRoutingService 100% cobertura (22 tests), geofence worker usa ruta planificada si existe, migración M-054 pendiente (Docker).
+> **Última actualización:** 2026-05-14 — Sprint 14 SistemaCustodias: UI de routing completa — sección "Ruta planificada" en CustodyOrderDetailPage (web admin), CustodyOperatorStack con CustodyOperatorHomeScreen + CustodyActiveOrderScreen (mobile), GET /orders/my endpoint para custodio/copiloto, 14 tests mobile, 0 errores TypeScript.
 
 ---
 
@@ -31,7 +31,7 @@
 | Admin Web Custody | ✅ Sprint 11 | 4 páginas custody: CustodyOrdersPage, CustodyOrderDetailPage, CustodyApprovalsPage, CustodyAlertsPage. api.getBlob(), Sidebar sección Custodia, 0 errores TS |
 | Custody Routing | ✅ Sprint 13 | POST/GET/PATCH /orders/:id/route, haversine distance, estimación duración, aprobación supervisor, geofence worker mejorado, 22 tests 100% cobertura, ADR-021 |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
-| Mobile App | ✅ Completo | Sprint 14+16 ✅ · vertical UX extensible (ADR-046) · título dinámico por vertical · 117 tests |
+| Mobile App | ✅ Sprint 14 | CustodyOperatorStack (Home+ActiveOrder), GET /orders/my, MapboxGL ruta planificada, firma digital, pánico, 14 tests nuevos |
 | Panel Web | ✅ Completo | Sprint 11 ✅ · AdminLayout + 6 páginas · título dinámico desde vertical config |
 | Infraestructura | ✅ Completo | Sprint 1: monorepo, docker-compose, API base, 22 migraciones, seeds, Jest, Playwright, CI |
 | Tests | 🔲 No iniciado | Estrategia definida |

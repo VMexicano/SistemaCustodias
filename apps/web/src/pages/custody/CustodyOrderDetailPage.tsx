@@ -119,6 +119,28 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   custom: 'Personalizada',
 };
 
+interface CustodyRoute {
+  id: string;
+  orderId: string;
+  waypoints: { lat: number; lng: number; label?: string }[];
+  totalDistanceKm: number | null;
+  estimatedDurationMinutes: number | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface WaypointRow {
+  lat: string;
+  lng: string;
+  label: string;
+}
+
+const PLANNABLE_STATUSES: OrderStatus[] = [
+  'APPROVED', 'ASSIGNED', 'REASSIGNED', 'CREW_CONFIRMED',
+];
+
 interface OperatorOption {
   id: string;
   operatorType: string;
@@ -142,6 +164,10 @@ export function CustodyOrderDetailPage() {
   const qc = useQueryClient();
   const [downloading, setDownloading] = useState(false);
 
+  // Route modal state
+  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [routeWaypoints, setRouteWaypoints] = useState<WaypointRow[]>([]);
+
   // Assign / reassign modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -164,6 +190,50 @@ export function CustodyOrderDetailPage() {
     queryFn: () => api.get<SecurityAlert[]>(`/orders/${id}/alerts`),
     enabled: !!order,
   });
+
+  const { data: route, isLoading: routeLoading } = useQuery<CustodyRoute | null>({
+    queryKey: ['custody-route', id],
+    queryFn: async () => {
+      try {
+        return await api.get<CustodyRoute>(`/orders/${id}/route`);
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!order,
+  });
+
+  const planRouteMutation = useMutation({
+    mutationFn: (waypoints: { lat: number; lng: number; label?: string }[]) =>
+      api.post(`/orders/${id}/route`, { waypoints }),
+    onSuccess: () => {
+      setShowRouteModal(false);
+      void qc.invalidateQueries({ queryKey: ['custody-route', id] });
+    },
+  });
+
+  const approveRouteMutation = useMutation({
+    mutationFn: () => api.patch(`/orders/${id}/route/approve`, {}),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['custody-route', id] }),
+  });
+
+  function openRouteModal() {
+    setRouteWaypoints(
+      (route?.waypoints ?? []).map((wp) => ({
+        lat: String(wp.lat),
+        lng: String(wp.lng),
+        label: wp.label ?? '',
+      })),
+    );
+    setShowRouteModal(true);
+  }
+
+  function submitRoute() {
+    const parsed = routeWaypoints
+      .map((wp) => ({ lat: parseFloat(wp.lat), lng: parseFloat(wp.lng), label: wp.label || undefined }))
+      .filter((wp) => !isNaN(wp.lat) && !isNaN(wp.lng));
+    planRouteMutation.mutate(parsed);
+  }
 
   const { data: availableOps } = useQuery<AvailableOperatorsResponse>({
     queryKey: ['operadores-available'],
@@ -414,6 +484,82 @@ export function CustodyOrderDetailPage() {
         </div>
       </div>
 
+      {/* Route planning */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-700">Ruta planificada</h2>
+          <div className="flex gap-2">
+            {PLANNABLE_STATUSES.includes(order.status) && (
+              <button
+                onClick={openRouteModal}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700"
+              >
+                {route ? 'Editar ruta' : 'Planificar ruta'}
+              </button>
+            )}
+            {route && !route.approvedAt && (
+              <button
+                onClick={() => approveRouteMutation.mutate()}
+                disabled={approveRouteMutation.isPending}
+                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                {approveRouteMutation.isPending ? 'Aprobando...' : 'Aprobar ruta'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {routeLoading ? (
+          <p className="text-sm text-gray-400">Cargando ruta...</p>
+        ) : route ? (
+          <div>
+            <div className="flex gap-6 text-sm text-gray-600 mb-3 flex-wrap">
+              {route.totalDistanceKm !== null && (
+                <span><span className="text-gray-400">Distancia: </span>{route.totalDistanceKm.toFixed(1)} km</span>
+              )}
+              {route.estimatedDurationMinutes !== null && (
+                <span><span className="text-gray-400">Duración estimada: </span>{route.estimatedDurationMinutes} min</span>
+              )}
+              {route.approvedAt ? (
+                <span className="text-green-600 font-medium">✓ Aprobada el {fmtDate(route.approvedAt)}</span>
+              ) : (
+                <span className="text-yellow-600">Pendiente de aprobación del supervisor</span>
+              )}
+            </div>
+            {route.waypoints.length > 0 ? (
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-2 py-1.5 text-gray-500 font-medium w-10">#</th>
+                    <th className="text-left px-2 py-1.5 text-gray-500 font-medium">Latitud</th>
+                    <th className="text-left px-2 py-1.5 text-gray-500 font-medium">Longitud</th>
+                    <th className="text-left px-2 py-1.5 text-gray-500 font-medium">Etiqueta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {route.waypoints.map((wp, i) => (
+                    <tr key={i} className="border-t border-gray-100">
+                      <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
+                      <td className="px-2 py-1.5 font-mono text-gray-700">{wp.lat.toFixed(6)}</td>
+                      <td className="px-2 py-1.5 font-mono text-gray-700">{wp.lng.toFixed(6)}</td>
+                      <td className="px-2 py-1.5 text-gray-600">{wp.label ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-xs text-gray-400">Sin waypoints intermedios (ruta directa pickup → delivery).</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">
+            {PLANNABLE_STATUSES.includes(order.status)
+              ? 'Sin ruta planificada. El despachador puede agregar waypoints.'
+              : 'Sin ruta planificada para esta orden.'}
+          </p>
+        )}
+      </div>
+
       {/* Transitions timeline */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">
@@ -487,6 +633,87 @@ export function CustodyOrderDetailPage() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Route planning modal */}
+      {showRouteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Planificar ruta</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Agrega waypoints intermedios entre pickup y delivery. El sistema calculará la distancia y duración estimada.
+            </p>
+
+            <div className="space-y-2 mb-4">
+              {routeWaypoints.length === 0 && (
+                <p className="text-sm text-gray-400 py-2">Sin waypoints — se usará ruta directa pickup → delivery.</p>
+              )}
+              {routeWaypoints.map((wp, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <span className="text-xs text-gray-400 w-5 text-right">{i + 1}</span>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Lat"
+                    value={wp.lat}
+                    onChange={(e) => setRouteWaypoints((prev) => prev.map((p, j) => j === i ? { ...p, lat: e.target.value } : p))}
+                    className="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Lng"
+                    value={wp.lng}
+                    onChange={(e) => setRouteWaypoints((prev) => prev.map((p, j) => j === i ? { ...p, lng: e.target.value } : p))}
+                    className="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Etiqueta (opcional)"
+                    value={wp.label}
+                    onChange={(e) => setRouteWaypoints((prev) => prev.map((p, j) => j === i ? { ...p, label: e.target.value } : p))}
+                    className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => setRouteWaypoints((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-red-400 hover:text-red-600 text-lg leading-none px-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setRouteWaypoints((prev) => [...prev, { lat: '', lng: '', label: '' }])}
+              className="text-sm text-blue-600 hover:text-blue-800 mb-4"
+            >
+              + Agregar waypoint
+            </button>
+
+            {planRouteMutation.isError && (
+              <p className="text-sm text-red-500 mb-3">
+                {(planRouteMutation.error as Error).message}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <button
+                onClick={() => setShowRouteModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitRoute}
+                disabled={planRouteMutation.isPending}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {planRouteMutation.isPending ? 'Guardando...' : 'Guardar ruta'}
+              </button>
+            </div>
           </div>
         </div>
       )}
