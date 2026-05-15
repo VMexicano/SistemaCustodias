@@ -4,7 +4,7 @@
 
 ---
 
-## Estado: ✅ Sprint 11 completo
+## Estado: ✅ Sprint 12 completo
 
 ## Stack web
 
@@ -74,13 +74,29 @@ const { id } = useParams({ strict: false }) as { id: string };
 
 ---
 
-## Pendiente (Sprint 12+)
+## Sprint 12 — Cambios adicionales
+
+**Backend:**
+- `operadores.types.ts`: `OperatorDTO` incluye `firstName?: string; lastName?: string`
+- `operadores.repository.ts`: `findAvailable` JOIN `users` → devuelve nombres
+- `operadores.service.ts`: `toDTO` propaga `firstName`/`lastName`
+
+**Frontend:**
+- `CustodyOrderDetailPage`: modal "Asignar equipo" (status APPROVED) + modal "Reasignar equipo" (status ASSIGNED/REASSIGNED)
+  - Selects filtrados por `operatorType` (custodio/copiloto)
+  - Validación: ambos seleccionados + no pueden ser el mismo operador
+  - `PATCH /orders/:id/assign` y `PATCH /orders/:id/reassign`
+- `useCustodyAlertCount`: hook con refetch 30s para alertas activas
+- `Sidebar`: badge rojo sobre "Alertas" cuando hay alertas activas custody
+
+**API nuevas consumidas:**
+- `GET /operadores/available` — lazy (solo cuando el modal está abierto)
+
+## Pendiente (Sprint 13+)
 
 - Mapa Mapbox en tiempo real (WebSocket /tracking)
-- Asignación de equipo desde UI (PATCH /orders/:id/assign) — requiere selector de operadores disponibles
 - Gestión de operadores custody (OperadoresPage)
 - Gestión de clientes custody (ClientsPage)
-- Badge en Sidebar de custody alerts (requiere hook de contador)
 
 ---
 

@@ -190,6 +190,9 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 11 Custodias] TanStack Router useParams: preferir `useParams({ strict: false }) as { id: string }` para páginas de detalle — evita que el `from` literal quede obsoleto si el path cambia
 ✓ [Sprint 11 Custodias] Sidebar multi-sección: usar array de NavSection con `title?: string` en lugar de flat NavItem[] cuando hay más de un grupo — el collapsed mode reemplaza el title con un divisor visual
 ✓ [Sprint 11 Custodias] Sprints frontend sin backend: verificar explícitamente qué endpoints ya existen (alerts.routes.ts, custody-orders.routes.ts) antes de planear — puede ahorrar todo un sprint de backend
+✓ [Sprint 12 Custodias] OperatorDTO sin nombre es insuficiente para selectores en UI — al planear cualquier feature con selector de operadores, incluir tarea de JOIN users en findAvailable como dependencia de la tarea frontend
+✓ [Sprint 12 Custodias] Queries lazy en TanStack Query: usar `enabled: showModal` para evitar requests innecesarios en páginas de detalle con datos opcionales (operadores disponibles solo se cargan cuando el modal se abre)
+✓ [Sprint 12 Custodias] Validación de mismo ID en selects: cuando un operador no puede ser su propio copiloto, el botón submit debe disabled cuando custodioId === copilotoId — documentar esta regla en el spec del modal
 ```
 
 ### Checklist de completitud por tarea — campos adicionales (Sprint 4+)

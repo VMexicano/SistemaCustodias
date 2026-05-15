@@ -41,6 +41,26 @@
 
 ## Próximas Tareas — Orden Recomendado
 
+### Sprint 12 SistemaCustodias — admin web: assign/reassign + alerts badge ✅ COMPLETO (2026-05-14)
+```
+[x] ADMIN-12-001: GET /operadores/available con nombres (JOIN users)
+    [x] operadores.types.ts: firstName? + lastName? en OperatorDTO
+    [x] operadores.repository.ts: findAvailable JOIN users → first_name, last_name
+    [x] operadores.service.ts: toDTO propaga campos nombre
+[x] ADMIN-12-002: Modal asignación en CustodyOrderDetailPage (status APPROVED)
+    [x] GET /operadores/available lazy (enabled cuando modal abierto)
+    [x] Selects filtrados custodio/copiloto con label nombre + licencia
+    [x] Validación: ambos seleccionados + no mismo operador en los dos roles
+    [x] PATCH /orders/:id/assign → invalidate query orden
+[x] ADMIN-12-003: Modal reasignación (status ASSIGNED/REASSIGNED)
+    [x] Pre-selección de equipo actual (order.custodio_id + copiloto_id)
+    [x] PATCH /orders/:id/reassign
+[x] ADMIN-12-004: useCustodyAlertCount hook + Sidebar badge activo
+    [x] GET /alerts?resolved=false refetch 30s
+    [x] Sidebar: badge rojo en "Alertas" custody cuando count > 0
+[x] TypeScript: 0 errores (api + web)
+```
+
 ### Sprint 11 SistemaCustodias — módulo admin web ✅ COMPLETO (2026-05-14)
 ```
 [x] ADMIN-WEB-001: Infraestructura web

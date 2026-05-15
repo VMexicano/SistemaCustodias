@@ -8,7 +8,7 @@
 
 ## Estado actual
 
-**Sprint:** 12 PENDIENTE — asignación de equipo + mapa en tiempo real (web admin)
+**Sprint:** 13 PENDIENTE — mapa Mapbox en tiempo real (web admin) o módulo routing
 **Fecha de sesión:** 2026-05-14
 **Tipo de contexto:** [ADMIN]
 **Objetivo:** Sprint 11 completado. Próxima sesión: asignación de custodio/copiloto desde UI + opcional: mapa Mapbox tracking
@@ -178,6 +178,25 @@
 - Tests: 28/28 pasando (1 suite compliance)
 - ChainOfCustodyService: 100% lines / 100% branches ✅
 - ADR-020 documentado
+
+---
+
+## Logros de Sprint 12 (2026-05-14)
+
+### ADMIN-12 — Asignación de equipo + alertas badge ✅
+
+**Backend:**
+- `OperatorDTO` extendido con `firstName?` / `lastName?`
+- `findAvailable` JOIN users — nombres disponibles en el selector
+
+**Frontend:**
+- Modal "Asignar equipo" en CustodyOrderDetailPage (status APPROVED) → `PATCH /orders/:id/assign`
+- Modal "Reasignar equipo" (status ASSIGNED/REASSIGNED) → `PATCH /orders/:id/reassign`
+- Selects filtrados por tipo (custodio/copiloto), validación: misma persona no puede ser los dos roles
+- `useCustodyAlertCount` hook + badge rojo en Sidebar "Alertas" cuando hay alertas activas
+
+**Calidad:**
+- TypeScript: 0 errores (api + web)
 
 ---
 
