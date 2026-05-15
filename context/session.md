@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 10 PENDIENTE — módulo `compliance` (cadena de custodia, firmas digitales, regulatorio) O `admin` (dashboard despachador/supervisor)
+**Sprint:** 11 PENDIENTE — módulo `admin` (dashboard despachador/supervisor)
 **Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [COMPLIANCE] o [ADMIN]
-**Objetivo:** Próxima sesión: definir con el usuario cuál es el siguiente sprint prioritario
+**Tipo de contexto:** [ADMIN]
+**Objetivo:** Próxima sesión: implementar dashboard admin (web) con vistas de dispatcher y supervisor
 
 ---
 
@@ -155,13 +155,39 @@
 
 ---
 
-## Próxima sesión — Sprint 9
+## Logros de Sprint 10 (2026-05-14)
 
-**Objetivo:** Módulo `scheduler` — órdenes de custodia programadas con ventanas de despacho
+### COMP-001 — Módulo compliance ✅
+
+**ChainOfCustodyService** — reporte on-demand, redacción por rol, SHA-256, PDF
+
+**Endpoints implementados (3):**
+- [x] `GET /orders/:id/chain-of-custody` — JSON report (dispatcher, supervisor, client)
+- [x] `GET /orders/:id/chain-of-custody/pdf` — PDF descargable (dispatcher, supervisor)
+- [x] `GET /orders/:id/signatures` — transiciones con digital_signature (dispatcher, supervisor)
+
+**Patrones críticos:**
+- Redacción automática: `declaredValue` y `signatureData` → `null` para `role === 'client'`
+- SHA-256 del contenido JSON (excluye campo `integrity`) — integridad verificable
+- `renderToPdf()` separada de `buildPdf()` para testabilidad unitaria
+- `pdfkit` pure JS — sin binarios nativos, compatible Railway/Render
+- Sin migración — lee de 9 tablas existentes
+
+### Calidad ✅
+- TypeScript: 0 errores
+- Tests: 28/28 pasando (1 suite compliance)
+- ChainOfCustodyService: 100% lines / 100% branches ✅
+- ADR-020 documentado
+
+---
+
+## Próxima sesión — Sprint 11
+
+**Objetivo:** Módulo `admin` — dashboard despachador/supervisor (web)
 
 **Cargar en contexto:**
-- `context/snapshots/scheduler.snapshot.md` (principal)
-- `context/snapshots/custody-orders.snapshot.md` (secundario — scheduler dispara órdenes)
+- `context/snapshots/admin.snapshot.md` (principal)
+- `steering/product.md` (actores y flujos)
 - `steering/coding-standards.md`
 
 ---

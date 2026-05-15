@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 9 completado. Módulo custody-scheduler activo: cron cada minuto, recordatorios 24h/1h/15m + dispatch alerts vía custodyNotificationsQueue, PATCH/DELETE /orders/:id/schedule, 15 tests 100% cobertura service, ADR-019.
+> Última actualización: 2026-05-14 — Sprint 10 completado. Módulo compliance activo: GET /orders/:id/chain-of-custody + GET /orders/:id/chain-of-custody/pdf + GET /orders/:id/signatures, SHA-256 integridad, pdfkit, 28 tests 100% cobertura service, ADR-020.
 
 ---
 
@@ -65,7 +65,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 10 | `payments` | ✅ Sprint 8 | Cobro automático Stripe post-COMPLETED, BullMQ worker, idempotencia, GET /orders/:id/payment |
 | 11 | `custody-scheduler` | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, cron + FOR UPDATE SKIP LOCKED |
 | 12 | `admin` | ⬜ Pendiente | Dashboard despachador/supervisor |
-| 13 | `compliance` | ⬜ Pendiente | Cadena de custodia, firma digital, regulatorio |
+| 13 | `compliance` | ✅ Sprint 10 | Cadena de custodia, firmas digitales, reportes auditables + PDF, SHA-256, 28 tests |
 
 ## Migraciones aplicadas
 
@@ -309,6 +309,7 @@ notifications (
 | ADR-017 | CustodyNotificationService: FCM + SMS fallback + CircuitBreaker en Redis | ✅ Vigente |
 | ADR-018 | CustodyPaymentService: reutiliza IPaymentGateway UBER_BASE + BullMQ post-COMPLETED | ✅ Vigente |
 | ADR-019 | custody-scheduler: cron cada minuto + custody_scheduled_reminders + FOR UPDATE SKIP LOCKED | ✅ Vigente |
+| ADR-020 | compliance: reporte on-demand + node:crypto SHA-256 + pdfkit | ✅ Vigente |
 
 ---
 

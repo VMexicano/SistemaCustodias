@@ -387,6 +387,35 @@ Las órdenes de custodia con `scheduled_at` necesitan recordatorios automáticos
 
 ---
 
+## ADR-020: compliance — reporte on-demand + SHA-256 + pdfkit
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+El módulo compliance necesita reportes de cadena de custodia auditables. Los datos ya existen en tablas implementadas (order_transitions, value_declarations, security_alerts). Había que decidir: (1) generación de PDF, (2) mecanismo de integridad, (3) almacenamiento vs on-demand.
+
+**Opciones consideradas:**
+| Aspecto | Opción | Pros | Contras |
+|---|---|---|---|
+| PDF | `pdfkit` | Pure JS, sin binarios nativos, compatible Railway/Render | Styling limitado |
+| PDF | `puppeteer` | HTML completo, headless Chrome | 100MB+, incompatible con Railway free tier |
+| PDF | `html-pdf` | Simple | Deprecated, usa PhantomJS |
+| Integridad | `node:crypto` SHA-256 | Built-in Node.js, cero dependencias extras | — |
+| Almacenamiento | On-demand (sin tabla) | Sin migración, simple, SHA-256 garantiza integridad | Ligera CPU por llamada |
+| Almacenamiento | `compliance_reports` table | Cacheado, más rápido | Migración nueva, invalidación compleja |
+
+**Decisión:** On-demand + `node:crypto` SHA-256 + `pdfkit`.
+
+**Consecuencias:**
+- Sin migración nueva — lee de `custody_orders`, `order_transitions`, `value_declarations`, `security_alerts`, `operators`, `users`, `custody_vehicles`, `custody_types`
+- `declaredValue` y `signatureData` se redactan (`null`) para `role === 'client'`
+- PDF disponible solo para dispatcher y supervisor
+- SVG de firma en PDF descoped MVP — solo texto "Firma digital capturada"
+- `renderToPdf()` separado de `buildPdf()` para testabilidad unitaria
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown

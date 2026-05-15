@@ -27,6 +27,7 @@
 | Notifications | ✅ Completo | Sprint 5: NotificationService + INotificationChannel + BullMQ worker + circuit breaker |
 | Scheduler | ✅ Completo | Sprint 6: cron cada minuto, SCHEDULED state, recordatorios 24h/1h/15m |
 | Custody Scheduler | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, 15 tests 100% cobertura, ADR-019 |
+| Compliance | ✅ Sprint 10 | Cadena de custodia JSON + PDF + firmas, SHA-256, redacción por rol, 28 tests 100% cobertura, ADR-020 |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
 | Mobile App | ✅ Completo | Sprint 14+16 ✅ · vertical UX extensible (ADR-046) · título dinámico por vertical · 117 tests |
 | Panel Web | ✅ Completo | Sprint 11 ✅ · AdminLayout + 6 páginas · título dinámico desde vertical config |
@@ -38,6 +39,30 @@
 ---
 
 ## Próximas Tareas — Orden Recomendado
+
+### Sprint 10 SistemaCustodias — módulo compliance ✅ COMPLETO (2026-05-14)
+```
+[x] COMP-001: módulo compliance completo
+    [x] compliance.types.ts — ChainOfCustodyReport, TransitionRecord, AlertRecord, SignatureRecord
+    [x] compliance.repository.ts — 6 métodos con JOINs multi-tabla
+    [x] chain-of-custody.service.ts — buildReport (redacción por rol), getSignatures, buildPdf, renderToPdf
+    [x] compliance.controller.ts — 3 handlers
+    [x] compliance.routes.ts — 3 rutas con auth (GET /chain-of-custody, /pdf, /signatures)
+    [x] pdfkit instalado como dep directa en apps/api
+    [x] SHA-256 via node:crypto built-in (sin deps extra)
+    [x] app.ts: ComplianceRepository + ChainOfCustodyService registrado en prefix /orders
+    [x] jest.config.ts: exclusiones compliance repo/controller/routes
+    [x] Sin migración (lee de 9 tablas existentes)
+[x] COMP-QA-001: 28 tests — chain-of-custody.service.test.ts
+    [x] ChainOfCustodyService: 100% lines / 100% branches ✅
+    [x] Casos: reporte completo dispatcher, redacción client (declaredValue+signature null),
+        POINT parsing, ORDER_NOT_FOUND, no custodio/copiloto, no vehicle, no valueDeclaration,
+        no alerts, no transitions, completedAt null, SHA-256 determinístico, SHA-256 cambia,
+        null actor names (buildReport + getSignatures), verified_at null, resolved_at null,
+        vehicle columns null, client undefined, invalid POINT format, PDF Buffer, renderToPdf branches
+[x] ADR-020: reporte on-demand + node:crypto SHA-256 + pdfkit
+[x] TypeScript: 0 errores
+```
 
 ### Sprint 9 SistemaCustodias — módulo custody-scheduler ✅ COMPLETO (2026-05-14)
 ```

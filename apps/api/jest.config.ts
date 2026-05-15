@@ -45,6 +45,10 @@ const config: Config = {
     '!src/modules/scheduler/scheduler.repository.ts',
     // custody-scheduler: repository uses raw SQL — integration-tested only
     '!src/modules/custody-scheduler/custody-scheduler.repository.ts',
+    // compliance: repository/controller/routes are integration-tested only
+    '!src/modules/compliance/compliance.repository.ts',
+    '!src/modules/compliance/compliance.controller.ts',
+    '!src/modules/compliance/compliance.routes.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],

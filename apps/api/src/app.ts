@@ -119,6 +119,9 @@ import { initCustodyPaymentsQueue, custodyPaymentsQueue } from './queues/custody
 import { registerCustodyPaymentWorker } from './workers/custody-payment-worker.js';
 import { CustodySchedulerRepository } from './modules/custody-scheduler/custody-scheduler.repository.js';
 import { CustodySchedulerService } from './modules/custody-scheduler/custody-scheduler.service.js';
+import { ComplianceRepository } from './modules/compliance/compliance.repository.js';
+import { ChainOfCustodyService } from './modules/compliance/chain-of-custody.service.js';
+import { complianceRoutes } from './modules/compliance/compliance.routes.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -516,6 +519,17 @@ export async function buildApp() {
     custodyNotificationsQueue,
   );
   custodySchedulerService.start();
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — compliance module (Sprint 10)
+  // ---------------------------------------------------------------------------
+
+  const complianceRepo = new ComplianceRepository(db);
+  const chainOfCustodyService = new ChainOfCustodyService(complianceRepo);
+  await app.register(complianceRoutes, {
+    prefix: '/orders',
+    complianceService: chainOfCustodyService,
+  });
 
   // Register orders routes now that both notification and payment queues are initialized
   await app.register(ordersRoutes, {

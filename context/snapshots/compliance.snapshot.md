@@ -1,90 +1,76 @@
-# Snapshot: compliance
-> Cadena de custodia, firma digital, documentación regulatoria.
-> Última actualización: 2026-05-13 — Sprint 0
+# Snapshot — compliance
 
----
+**Estado:** ✅ Sprint 10 completo
+**Última actualización:** 2026-05-14
 
-## Archivo(s) principal(es)
+## Módulo implementado
 
-```
-apps/api/src/modules/compliance/
-  compliance.routes.ts
-  compliance.controller.ts
-  compliance.service.ts
-  compliance.repository.ts
-  chain-of-custody.ts       ← generación de reportes
-  compliance.types.ts
-```
+### ChainOfCustodyService (`apps/api/src/modules/compliance/`)
+- `compliance.types.ts` — ChainOfCustodyReport, TransitionRecord, AlertRecord, SignatureRecord
+- `compliance.repository.ts` — getOrderWithType, getClientForOrder, getOperatorData, getTransitionsWithActors, getValueDeclaration, getAlerts
+- `chain-of-custody.service.ts` — buildReport(orderId, actorRole), getSignatures(orderId), buildPdf(orderId, actorRole), renderToPdf(report)
+- `compliance.controller.ts` — getChainOfCustody, getChainOfCustodyPdf, getSignatures
+- `compliance.routes.ts` — 3 rutas con auth
 
----
-
-## Responsabilidades del módulo
-
-1. **Cadena de custodia** — Reporte completo de toda la orden: cada actor, cada transición, timestamp y GPS
-2. **Firma digital** — Captura, validación y almacenamiento de firmas en puntos críticos
-3. **Documentación regulatoria** — Generación de documentos para auditorías
-4. **Verificación de valor declarado** — Supervisor verifica que la declaración sea correcta antes de aprobar
-
----
-
-## Puntos de firma digital obligatorios
-
-| Transición | Quién firma | Descripción |
-|---|---|---|
-| `AT_PICKUP → IN_TRANSIT` | Cliente o representante | Confirma entrega del cargo al equipo |
-| `AT_DELIVERY → DELIVERED` | Receptor designado | Confirma recepción del cargo |
-
-Las firmas se almacenan en `order_transitions.digital_signature` como Base64 SVG.
-
----
-
-## Reporte de cadena de custodia
-
-Se genera automáticamente cuando la orden llega a `COMPLETED`.
-
-**Contenido del reporte:**
-
-```
-1. Datos de la orden (número, tipo, fechas)
-2. Datos del cliente
-3. Datos del equipo (custodio + copiloto + vehículo)
-4. Valor declarado
-5. Cronología completa de transiciones:
-   - DRAFT → PENDING_APPROVAL (quién, cuándo)
-   - PENDING_APPROVAL → APPROVED (supervisor, cuándo, geolocalización)
-   - ... (cada transición)
-   - DELIVERED → COMPLETED (quién, cuándo)
-6. Firmas digitales (imagen Base64)
-7. Alertas registradas (si las hubo)
-8. Hash SHA-256 del reporte completo (integridad)
-```
-
----
-
-## Endpoints
-
-| Método | Ruta | Actor | Descripción |
+### Endpoints REST
+| Método | Ruta | Roles | Descripción |
 |---|---|---|---|
-| GET | `/orders/:id/chain-of-custody` | dispatcher, supervisor, client | Reporte de cadena de custodia |
-| GET | `/orders/:id/chain-of-custody/pdf` | dispatcher, supervisor | Descargar PDF |
-| POST | `/orders/:id/signatures` | custodio (actúa en nombre del cliente/receptor) | Guardar firma digital |
-| GET | `/orders/:id/signatures` | dispatcher, supervisor | Ver firmas de la orden |
+| GET | `/orders/:id/chain-of-custody` | dispatcher, supervisor, client | Reporte JSON con SHA-256 |
+| GET | `/orders/:id/chain-of-custody/pdf` | dispatcher, supervisor | Descarga PDF (`application/pdf`) |
+| GET | `/orders/:id/signatures` | dispatcher, supervisor | Transiciones con firma digital |
 
----
+## Estructura del reporte (ChainOfCustodyReport)
 
-## Reglas críticas
+```typescript
+{
+  reportId: string;          // UUID generado en cada llamada
+  generatedAt: string;       // ISO8601
+  order: { id, orderNumber, status, custodyType, custodyTypeSlug, pickupAddress, deliveryAddress, notes, createdAt, completedAt | null }
+  client: { id, name, companyName | null, rfc | null }
+  team: {
+    custodio: { id, name, licenseNumber | null } | null
+    copiloto: { id, name, licenseNumber | null } | null
+    vehicle: { id, plate, make | null, model, year } | null
+  }
+  valueDeclaration: {
+    custodyType, declaredValue | null, insurancePolicyId | null, verifiedAt | null, verifiedBy | null
+  } | null
+  transitions: TransitionRecord[]   // ORDER BY created_at ASC
+  alerts: AlertRecord[]
+  integrity: { hash: string; algorithm: 'sha256' }
+}
+```
 
-1. Los registros de `order_transitions` son **inmutables** — nunca UPDATE, solo INSERT
-2. El reporte de cadena de custodia incluye un hash SHA-256 para verificar integridad
-3. Las firmas se validan antes de aceptar la transición (no nulas, mínimo N bytes)
-4. Solo el supervisor puede ver los reportes PDF completos con valor declarado
-5. Los clientes pueden ver su propio reporte pero sin el valor exacto declarado de otros
+## Reglas de redacción por rol
 
----
+| Campo | dispatcher / supervisor | client |
+|---|---|---|
+| `valueDeclaration.declaredValue` | Valor completo | `null` |
+| `TransitionRecord.signatureData` | Base64 SVG | `null` |
+| Acceso a PDF | ✅ | ❌ |
 
-## Dependencias entre módulos
+## Fuentes de datos (sin migración nueva)
 
-- `custody-orders` — Lee todas las transiciones de `order_transitions`
-- `value-declaration` — Incluye la declaración de valores en el reporte
-- `operadores` — Datos del equipo asignado
-- `clients` — Datos del cliente en el reporte
+| Tabla | Columnas usadas |
+|---|---|
+| `custody_orders` | id, order_number, status, custody_type_id, client_id, custodio_id, copiloto_id, pickup_address, delivery_address, notes, created_at |
+| `custody_types` | name, slug |
+| `clients` | id, contact_name, company_name, rfc |
+| `operators` | id, user_id, license_number, vehicle_id |
+| `users` | id, first_name, last_name |
+| `custody_vehicles` | id, plate, make, model, year |
+| `order_transitions` | id, from_status, to_status, actor_id, actor_role, location (POINT::text), notes, digital_signature, created_at |
+| `value_declarations` | declared_value, custody_type_id, insurance_policy_id, verified_at, verified_by |
+| `security_alerts` | id, alert_type, severity, description, resolved_at, created_at |
+
+## Dependencias externas
+
+- `pdfkit` (instalado en apps/api) — generación de PDF pure JS, sin binarios nativos
+- `node:crypto` (built-in) — SHA-256 hash de integridad
+- ADR-020: reporte on-demand + SHA-256 + pdfkit
+
+## Cobertura de tests
+
+- `ChainOfCustodyService`: **100% lines / 100% branches** (umbral: ≥90% / ≥85%) ✅
+- Tests: `chain-of-custody.service.test.ts` — 28 casos
+- jest.config.ts: compliance.repository.ts, compliance.controller.ts, compliance.routes.ts excluidos (integration-tested only)
