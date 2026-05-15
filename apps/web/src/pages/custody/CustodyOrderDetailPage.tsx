@@ -119,10 +119,34 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   custom: 'Personalizada',
 };
 
+interface OperatorOption {
+  id: string;
+  operatorType: string;
+  licenseNumber: string | null;
+  firstName?: string;
+  lastName?: string;
+}
+
+interface AvailableOperatorsResponse {
+  data: OperatorOption[];
+}
+
+function operatorLabel(op: OperatorOption): string {
+  const name = [op.firstName, op.lastName].filter(Boolean).join(' ');
+  const license = op.licenseNumber ? ` (${op.licenseNumber})` : '';
+  return name ? `${name}${license}` : `ID: ${op.id.slice(0, 8)}...${license}`;
+}
+
 export function CustodyOrderDetailPage() {
   const { id } = useParams({ strict: false }) as { id: string };
   const qc = useQueryClient();
   const [downloading, setDownloading] = useState(false);
+
+  // Assign / reassign modal state
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [selectedCustodioId, setSelectedCustodioId] = useState('');
+  const [selectedCopilotoId, setSelectedCopilotoId] = useState('');
 
   const { data: order, isLoading, isError } = useQuery<CustodyOrder>({
     queryKey: ['custody-order', id],
@@ -141,10 +165,53 @@ export function CustodyOrderDetailPage() {
     enabled: !!order,
   });
 
+  const { data: availableOps } = useQuery<AvailableOperatorsResponse>({
+    queryKey: ['operadores-available'],
+    queryFn: () => api.get<AvailableOperatorsResponse>('/operadores/available'),
+    enabled: showAssignModal || showReassignModal,
+  });
+
+  const custodios = (availableOps?.data ?? []).filter((o) => o.operatorType === 'custodio');
+  const copilotos = (availableOps?.data ?? []).filter((o) => o.operatorType === 'copiloto');
+
   const approveMutation = useMutation({
     mutationFn: () => api.patch(`/orders/${id}/approve`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['custody-order', id] }),
   });
+
+  const assignMutation = useMutation({
+    mutationFn: (payload: { custodioId: string; copilotoId: string }) =>
+      api.patch(`/orders/${id}/assign`, payload),
+    onSuccess: () => {
+      setShowAssignModal(false);
+      setSelectedCustodioId('');
+      setSelectedCopilotoId('');
+      void qc.invalidateQueries({ queryKey: ['custody-order', id] });
+    },
+  });
+
+  const reassignMutation = useMutation({
+    mutationFn: (payload: { custodioId: string; copilotoId: string }) =>
+      api.patch(`/orders/${id}/reassign`, payload),
+    onSuccess: () => {
+      setShowReassignModal(false);
+      setSelectedCustodioId('');
+      setSelectedCopilotoId('');
+      void qc.invalidateQueries({ queryKey: ['custody-order', id] });
+    },
+  });
+
+  function openAssign() {
+    setSelectedCustodioId(order?.custodio_id ?? '');
+    setSelectedCopilotoId(order?.copiloto_id ?? '');
+    setShowAssignModal(true);
+  }
+
+  function openReassign() {
+    setSelectedCustodioId(order?.custodio_id ?? '');
+    setSelectedCopilotoId(order?.copiloto_id ?? '');
+    setShowReassignModal(true);
+  }
 
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -210,7 +277,7 @@ export function CustodyOrderDetailPage() {
           </span>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {order.status === 'PENDING_APPROVAL' && (
             <>
               <button
@@ -227,6 +294,22 @@ export function CustodyOrderDetailPage() {
                 Rechazar
               </button>
             </>
+          )}
+          {order.status === 'APPROVED' && (
+            <button
+              onClick={openAssign}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+            >
+              Asignar equipo
+            </button>
+          )}
+          {(order.status === 'ASSIGNED' || order.status === 'REASSIGNED') && (
+            <button
+              onClick={openReassign}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+            >
+              Reasignar equipo
+            </button>
           )}
           <button
             onClick={() => void downloadPdf()}
@@ -441,6 +524,101 @@ export function CustodyOrderDetailPage() {
                 className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
               >
                 {rejectMutation.isPending ? 'Rechazando...' : 'Rechazar orden'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign / Reassign modal — shared layout */}
+      {(showAssignModal || showReassignModal) && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">
+              {showAssignModal ? 'Asignar equipo' : 'Reasignar equipo'}
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Selecciona el custodio y copiloto disponibles para esta orden.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custodio
+                </label>
+                <select
+                  value={selectedCustodioId}
+                  onChange={(e) => setSelectedCustodioId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">— Seleccionar custodio —</option>
+                  {custodios.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {operatorLabel(op)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Copiloto
+                </label>
+                <select
+                  value={selectedCopilotoId}
+                  onChange={(e) => setSelectedCopilotoId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">— Seleccionar copiloto —</option>
+                  {copilotos.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {operatorLabel(op)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {(showAssignModal ? assignMutation : reassignMutation).isError && (
+              <p className="text-sm text-red-500 mt-3">
+                {((showAssignModal ? assignMutation : reassignMutation).error as Error).message}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setShowReassignModal(false);
+                  setSelectedCustodioId('');
+                  setSelectedCopilotoId('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const payload = {
+                    custodioId: selectedCustodioId,
+                    copilotoId: selectedCopilotoId,
+                  };
+                  if (showAssignModal) assignMutation.mutate(payload);
+                  else reassignMutation.mutate(payload);
+                }}
+                disabled={
+                  !selectedCustodioId ||
+                  !selectedCopilotoId ||
+                  selectedCustodioId === selectedCopilotoId ||
+                  (showAssignModal ? assignMutation : reassignMutation).isPending
+                }
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {(showAssignModal ? assignMutation : reassignMutation).isPending
+                  ? 'Guardando...'
+                  : showAssignModal
+                    ? 'Asignar'
+                    : 'Reasignar'}
               </button>
             </div>
           </div>

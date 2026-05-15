@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { usePendingApprovals } from '../../hooks/usePendingApprovals';
+import { useCustodyAlertCount } from '../../hooks/useCustodyAlertCount';
 
 interface NavItem {
   path: string;
   label: string;
   icon: string;
   exact?: boolean;
-  badge?: 'pending_approvals';
+  badge?: 'pending_approvals' | 'active_alerts';
 }
 
 interface NavSection {
@@ -33,7 +34,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { path: '/admin/custody/orders', label: 'Órdenes', icon: '📦' },
       { path: '/admin/custody/approvals', label: 'Aprobaciones', icon: '✅', badge: 'pending_approvals' },
-      { path: '/admin/custody/alerts', label: 'Alertas', icon: '🚨' },
+      { path: '/admin/custody/alerts', label: 'Alertas', icon: '🚨', badge: 'active_alerts' },
     ],
   },
 ];
@@ -45,9 +46,11 @@ export function Sidebar() {
   } = useRouterState();
 
   const { total: pendingCount } = usePendingApprovals(1, 0);
+  const activeAlertsCount = useCustodyAlertCount();
 
   function getBadgeCount(badge: NavItem['badge']): number {
     if (badge === 'pending_approvals') return pendingCount;
+    if (badge === 'active_alerts') return activeAlertsCount;
     return 0;
   }
 

@@ -22,6 +22,8 @@ export interface OperatorDTO {
   licenseNumber: string | null;
   certifications: Record<string, string>;
   status: OperatorStatus;
+  firstName?: string;
+  lastName?: string;
   createdAt: string;
 }
 

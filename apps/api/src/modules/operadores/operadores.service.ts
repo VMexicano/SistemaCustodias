@@ -10,7 +10,7 @@ import type {
   SuspendOperatorInput,
 } from './operadores.types.js';
 
-function toDTO(op: Operator): OperatorDTO {
+function toDTO(op: Operator & { first_name?: string; last_name?: string }): OperatorDTO {
   return {
     id: op.id,
     userId: op.user_id,
@@ -19,6 +19,8 @@ function toDTO(op: Operator): OperatorDTO {
     licenseNumber: op.license_number,
     certifications: op.certifications,
     status: op.status,
+    firstName: op.first_name,
+    lastName: op.last_name,
     createdAt: op.created_at.toISOString(),
   };
 }

@@ -8,6 +8,11 @@ export interface CreateOperatorData {
   certifications?: Record<string, string>;
 }
 
+export interface OperatorWithName extends Operator {
+  first_name?: string;
+  last_name?: string;
+}
+
 export class OperadoresRepository {
   constructor(private readonly db: Database) {}
 
@@ -25,13 +30,14 @@ export class OperadoresRepository {
       .first();
   }
 
-  async findAvailable(tenantId: string, operatorType?: OperatorType): Promise<Operator[]> {
-    const query = this.db<Operator>('operators')
+  async findAvailable(tenantId: string, operatorType?: OperatorType): Promise<OperatorWithName[]> {
+    const query = this.db<OperatorWithName>('operators')
       .join('company_users', 'operators.user_id', 'company_users.user_id')
+      .join('users', 'operators.user_id', 'users.id')
       .where('company_users.company_id', tenantId)
       .where('operators.status', 'available')
       .whereNull('operators.deleted_at')
-      .select('operators.*')
+      .select('operators.*', 'users.first_name', 'users.last_name')
       .orderBy('operators.created_at', 'asc');
 
     if (operatorType) {
