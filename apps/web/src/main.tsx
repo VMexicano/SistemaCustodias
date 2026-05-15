@@ -20,6 +20,10 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { VerticalesPage } from './pages/VerticalesPage';
 import { AprobacionesPage } from './pages/AprobacionesPage';
+import { CustodyOrdersPage } from './pages/custody/CustodyOrdersPage';
+import { CustodyOrderDetailPage } from './pages/custody/CustodyOrderDetailPage';
+import { CustodyApprovalsPage } from './pages/custody/CustodyApprovalsPage';
+import { CustodyAlertsPage } from './pages/custody/CustodyAlertsPage';
 import './index.css';
 
 const queryClient = new QueryClient();
@@ -100,6 +104,30 @@ const configRoute = createRoute({
   component: ConfigPage,
 });
 
+const custodyOrdersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/admin/custody/orders',
+  component: CustodyOrdersPage,
+});
+
+const custodyOrderDetailRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/admin/custody/orders/$id',
+  component: CustodyOrderDetailPage,
+});
+
+const custodyApprovalsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/admin/custody/approvals',
+  component: CustodyApprovalsPage,
+});
+
+const custodyAlertsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/admin/custody/alerts',
+  component: CustodyAlertsPage,
+});
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
@@ -121,6 +149,10 @@ const routeTree = rootRoute.addChildren([
     verticalesRoute,
     approvalsRoute,
     configRoute,
+    custodyOrdersRoute,
+    custodyOrderDetailRoute,
+    custodyApprovalsRoute,
+    custodyAlertsRoute,
   ]),
   indexRoute,
 ]);
