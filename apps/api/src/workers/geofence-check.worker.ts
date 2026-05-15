@@ -8,6 +8,7 @@ import type { Knex } from 'knex';
 import { isOutsideRoute, type Point } from '../modules/custody-tracking/geofence.utils.js';
 import type { GeofenceCheckJobData } from '../queues/geofence.queue.js';
 import type { AlertEngine } from '../modules/alerts/alert-engine.js';
+import type { CustodyRoutingService } from '../modules/custody-routing/custody-routing.service.js';
 
 const QUEUE_NAME = 'geofence-check';
 const GEOFENCE_THRESHOLD_METERS = 500;
@@ -27,6 +28,7 @@ export function registerGeofenceWorker(
   db: Knex,
   redis: Redis,
   alertEngine: AlertEngine,
+  routingService?: CustodyRoutingService,
 ): Worker<GeofenceCheckJobData> {
   const connection = redis.duplicate({ maxRetriesPerRequest: null });
 
@@ -53,21 +55,27 @@ export function registerGeofenceWorker(
       const pickup = order.pickup_address;
       const delivery = order.delivery_address;
 
-      // 2. Build a simple two-point polyline from pickup → delivery
-      // Skip if either endpoint is missing GPS coordinates
-      if (
-        !pickup?.lat ||
-        !pickup?.lng ||
-        !delivery?.lat ||
-        !delivery?.lng
-      ) {
-        return;
+      // 2. Use planned route polyline if available; fall back to simple pickup→delivery
+      let polyline: Point[] | null = null;
+
+      if (routingService) {
+        polyline = await routingService.getRoutePolyline(order_id);
       }
 
-      const polyline: Point[] = [
-        { lat: Number(pickup.lat), lng: Number(pickup.lng) },
-        { lat: Number(delivery.lat), lng: Number(delivery.lng) },
-      ];
+      if (!polyline) {
+        if (
+          !pickup?.lat ||
+          !pickup?.lng ||
+          !delivery?.lat ||
+          !delivery?.lng
+        ) {
+          return;
+        }
+        polyline = [
+          { lat: Number(pickup.lat), lng: Number(pickup.lng) },
+          { lat: Number(delivery.lat), lng: Number(delivery.lng) },
+        ];
+      }
 
       const currentPoint: Point = { lat, lng };
 

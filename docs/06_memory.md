@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-14 — Sprint 9 SistemaCustodias: módulo custody-scheduler completo — cron recordatorios 24h/1h/15m + dispatch alerts + PATCH/DELETE /orders/:id/schedule + 15 tests 100% cobertura (POST /tracking/location, GET /tracking/:orderId/current|history, WebSocket namespace /tracking, geofence-check BullMQ worker, geofence.utils haversine) + 35 tests (100% cobertura CustodyTrackingService + geofence.utils).
+> **Última actualización:** 2026-05-14 — Sprint 13 SistemaCustodias: módulo custody-routing completo — POST/GET/PATCH /orders/:id/route, CustodyRoutingService 100% cobertura (22 tests), geofence worker usa ruta planificada si existe, migración M-054 pendiente (Docker).
 
 ---
 
@@ -29,6 +29,7 @@
 | Custody Scheduler | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, 15 tests 100% cobertura, ADR-019 |
 | Compliance | ✅ Sprint 10 | Cadena de custodia JSON + PDF + firmas, SHA-256, redacción por rol, 28 tests 100% cobertura, ADR-020 |
 | Admin Web Custody | ✅ Sprint 11 | 4 páginas custody: CustodyOrdersPage, CustodyOrderDetailPage, CustodyApprovalsPage, CustodyAlertsPage. api.getBlob(), Sidebar sección Custodia, 0 errores TS |
+| Custody Routing | ✅ Sprint 13 | POST/GET/PATCH /orders/:id/route, haversine distance, estimación duración, aprobación supervisor, geofence worker mejorado, 22 tests 100% cobertura, ADR-021 |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
 | Mobile App | ✅ Completo | Sprint 14+16 ✅ · vertical UX extensible (ADR-046) · título dinámico por vertical · 117 tests |
 | Panel Web | ✅ Completo | Sprint 11 ✅ · AdminLayout + 6 páginas · título dinámico desde vertical config |

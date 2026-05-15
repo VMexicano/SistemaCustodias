@@ -122,6 +122,9 @@ import { CustodySchedulerService } from './modules/custody-scheduler/custody-sch
 import { ComplianceRepository } from './modules/compliance/compliance.repository.js';
 import { ChainOfCustodyService } from './modules/compliance/chain-of-custody.service.js';
 import { complianceRoutes } from './modules/compliance/compliance.routes.js';
+import { CustodyRoutingRepository } from './modules/custody-routing/custody-routing.repository.js';
+import { CustodyRoutingService } from './modules/custody-routing/custody-routing.service.js';
+import { custodyRoutingRoutes } from './modules/custody-routing/custody-routing.routes.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -531,6 +534,17 @@ export async function buildApp() {
     complianceService: chainOfCustodyService,
   });
 
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — custody-routing module (Sprint 13)
+  // ---------------------------------------------------------------------------
+
+  const custodyRoutingRepo = new CustodyRoutingRepository(db);
+  const custodyRoutingService = new CustodyRoutingService(custodyRoutingRepo, db);
+  await app.register(custodyRoutingRoutes, {
+    prefix: '/orders',
+    routingService: custodyRoutingService,
+  });
+
   // Register orders routes now that both notification and payment queues are initialized
   await app.register(ordersRoutes, {
     prefix: '/orders',
@@ -554,7 +568,7 @@ export async function buildApp() {
   await app.register(alertsRoutes, { prefix: '/alerts', alertEngine, alertsRepo, db });
   await app.register(orderAlertsRoutes, { prefix: '/orders', alertEngine, alertsRepo, db });
 
-  registerGeofenceWorker(db, redis, alertEngine);
+  registerGeofenceWorker(db, redis, alertEngine, custodyRoutingService);
 
   // ---------------------------------------------------------------------------
   // Health check endpoint

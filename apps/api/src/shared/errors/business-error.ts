@@ -107,7 +107,10 @@ export type BusinessErrorCode =
   // Custody scheduler
   | 'ORDER_NOT_IN_DRAFT_STATUS'
   | 'SCHEDULED_AT_TOO_SOON'
-  | 'INVALID_PICKUP_WINDOW';
+  | 'INVALID_PICKUP_WINDOW'
+  // Custody routing
+  | 'ROUTE_NOT_FOUND'
+  | 'ORDER_NOT_PLANNABLE';
 
 const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   PASSENGER_HAS_ACTIVE_TRIP: 409,
@@ -193,6 +196,8 @@ const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   ORDER_NOT_IN_DRAFT_STATUS: 409,
   SCHEDULED_AT_TOO_SOON: 422,
   INVALID_PICKUP_WINDOW: 422,
+  ROUTE_NOT_FOUND: 404,
+  ORDER_NOT_PLANNABLE: 409,
 };
 
 export class BusinessError extends Error {

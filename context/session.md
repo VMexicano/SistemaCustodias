@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 13 PENDIENTE — mapa Mapbox en tiempo real (web admin) o módulo routing
+**Sprint:** 13 COMPLETO ✅ — módulo custody-routing
 **Fecha de sesión:** 2026-05-14
-**Tipo de contexto:** [ADMIN]
-**Objetivo:** Sprint 11 completado. Próxima sesión: asignación de custodio/copiloto desde UI + opcional: mapa Mapbox tracking
+**Tipo de contexto:** [COMPLIANCE] / [TRACKING]
+**Objetivo:** Sprint 13 completado. Módulo custody-routing implementado y con tests. Migración M-054 pendiente (Docker no activo).
 
 ---
 

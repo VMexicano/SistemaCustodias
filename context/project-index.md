@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 12 completado. Admin web: modal asignar/reasignar equipo en CustodyOrderDetailPage, badge alertas activas en Sidebar, OperatorDTO con firstName/lastName (JOIN users en findAvailable), TypeScript 0 errores.
+> Última actualización: 2026-05-14 — Sprint 13 completado. Módulo custody-routing: POST/GET/PATCH /orders/:id/route, CustodyRoutingService 100% cobertura (22 tests), geofence worker actualizado con ruta planificada, migración M-054 (custody_routes), TypeScript 0 errores.
 
 ---
 
@@ -58,7 +58,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 03 | `operadores` | ✅ Sprint 2 | CRUD operadores — disponibilidad, suspensión, estado |
 | 04 | `custody-orders` | ✅ Sprint 3 | State machine 18 estados, 20 endpoints, snapshots, audit log |
 | 05 | `value-declaration` | ✅ Sprint 4 | POST/GET /orders/:id/value-declaration, Ajv JSONB schema, GET /custody-types, CustodyClientStack mobile |
-| 06 | `routing` | ⬜ Pendiente | Planeación y validación de rutas seguras |
+| 06 | `custody-routing` | ✅ Sprint 13 | Planeación de rutas con waypoints, distancia haversine, estimación duración, aprobación supervisor |
 | 07 | `custody-tracking` | ✅ Sprint 5 | GPS tiempo real — TimescaleDB + WebSocket + geofence worker, 35 tests |
 | 08 | `alerts` | ✅ Sprint 6 | AlertEngine (panic/tamper/geofence/custom), severity map, dedup 30s, supervisor-only critical, 34 tests |
 | 09 | `custody-notifications` | ✅ Sprint 7 | FCM push + SMS fallback + CircuitBreaker Redis (threshold 5/60s), routing 12 estados, 44 tests |
@@ -84,6 +84,9 @@ M-048      pricing_rules                        ✅ Sprint 1
 M-049      custody_payments                     ✅ Sprint 1
 M-050      alter_companies_add_tenant_id        ✅ Sprint 1
 M-051      alter_user_roles_add_custody_check   ✅ Sprint 1
+M-052      notifications                        ✅ Sprint 7
+M-053      custody_scheduled_reminders          ✅ Sprint 9
+M-054      custody_routes                       ⏳ Pendiente (Docker requerido)
 ```
 
 ---
@@ -310,6 +313,7 @@ notifications (
 | ADR-018 | CustodyPaymentService: reutiliza IPaymentGateway UBER_BASE + BullMQ post-COMPLETED | ✅ Vigente |
 | ADR-019 | custody-scheduler: cron cada minuto + custody_scheduled_reminders + FOR UPDATE SKIP LOCKED | ✅ Vigente |
 | ADR-020 | compliance: reporte on-demand + node:crypto SHA-256 + pdfkit | ✅ Vigente |
+| ADR-021 | custody-routing: haversine polyline + AVG_SPEED 60kmh + geofence fallback a ruta planificada | ✅ Vigente |
 
 ---
 
