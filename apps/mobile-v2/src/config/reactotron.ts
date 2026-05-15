@@ -3,7 +3,7 @@ if (__DEV__) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Reactotron = require('reactotron-react-native').default;
   Reactotron
-    .configure({ name: 'RideBase Mobile', port: 9091 })
+    .configure({ name: 'Custodia de Valores', port: 9091 })
     .useReactNative({
       // Auto-intercepts all XHR/fetch — shows full req+res in Reactotron Network tab
       networking: { ignoreUrls: /symbolicate|hot-update/ },
