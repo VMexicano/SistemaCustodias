@@ -6,12 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { apiClient } from '../../services/api.client';
-import { useAuthStore } from '../../stores/auth.store';
+import { useAuthStore, type UserRole } from '../../stores/auth.store';
 import { useVerticalStore } from '../../stores/vertical.store';
 import NotificationService from '../../services/notification.service';
 import { ENV } from '../../config/env';
+import { tlog } from '../../config/reactotron';
 
 const colors = {
   primary900: '#1F3864',
@@ -21,6 +23,26 @@ const colors = {
 };
 
 type LoginStep = 'phone' | 'otp';
+
+const DEV_ACTORS = [
+  { label: 'Cliente',     phone: '+525500000099', color: '#2E75B6' },
+  { label: 'Supervisor',  phone: '+525500000098', color: '#7B2D8B' },
+  { label: 'Dispatcher',  phone: '+525500000097', color: '#1D6A2B' },
+  { label: 'Custodio',    phone: '+525500000096', color: '#C0392B' },
+  { label: 'Copiloto',    phone: '+525500000095', color: '#E67E22' },
+  { label: 'Pasajero',    phone: '+525500000001', color: '#6C757D' },
+  { label: 'Conductor',   phone: '+525500000002', color: '#6C757D' },
+] as const;
+
+function resolveRole(roles: string[]): UserRole {
+  if (roles.includes('custodio')) return 'custodio';
+  if (roles.includes('copiloto')) return 'copiloto';
+  if (roles.includes('client')) return 'client';
+  if (roles.includes('dispatcher')) return 'dispatcher';
+  if (roles.includes('supervisor')) return 'supervisor';
+  if (roles.includes('driver')) return 'driver';
+  return 'passenger';
+}
 
 export default function LoginScreen(): React.JSX.Element {
   const { name: verticalName, loaded } = useVerticalStore();
@@ -58,8 +80,10 @@ export default function LoginScreen(): React.JSX.Element {
         user: { id: string };
       }>('/auth/verify-phone', { phone: phone.trim(), otp: otp.trim() });
       const { accessToken, refreshToken, roles, user } = res.data;
+      const role = resolveRole(roles);
+      tlog('auth:login', { userId: user.id, roles, resolvedRole: role });
       setTokens(accessToken, refreshToken);
-      setUser(user.id, roles.includes('driver') ? 'driver' : 'passenger');
+      setUser(user.id, role);
       void NotificationService.registerToken();
     } catch {
       setErrorMsg('Código incorrecto. Intenta de nuevo.');
@@ -128,39 +152,25 @@ export default function LoginScreen(): React.JSX.Element {
 
       {__DEV__ && (
         <View style={styles.devPanel}>
-          <Text style={styles.devLabel}>DEV — acceso rápido</Text>
-          <View style={styles.devRow}>
-            <TouchableOpacity
-              style={styles.devBtn}
-              onPress={() => {
-                setPhone('+525500000001');
-                setErrorMsg('');
-                if (step === 'otp') {
+          <Text style={styles.devLabel}>DEV — acceso rápido (OTP: 123456)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.devRow}>
+            {DEV_ACTORS.map((actor) => (
+              <TouchableOpacity
+                key={actor.phone}
+                style={[styles.devBtn, { borderColor: actor.color }]}
+                onPress={() => {
+                  setPhone(actor.phone);
                   setOtp('123456');
-                } else {
+                  setErrorMsg('');
                   setStep('phone');
-                }
-              }}
-              accessibilityRole="button"
-            >
-              <Text style={styles.devBtnText}>Pasajero</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.devBtn}
-              onPress={() => {
-                setPhone('+525500000002');
-                setErrorMsg('');
-                if (step === 'otp') {
-                  setOtp('123456');
-                } else {
-                  setStep('phone');
-                }
-              }}
-              accessibilityRole="button"
-            >
-              <Text style={styles.devBtnText}>Conductor</Text>
-            </TouchableOpacity>
-          </View>
+                }}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.devBtnText, { color: actor.color }]}>{actor.label}</Text>
+                <Text style={styles.devBtnPhone}>{actor.phone.slice(-4)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -215,11 +225,12 @@ const styles = StyleSheet.create({
   devPanel: {
     position: 'absolute',
     bottom: 24,
-    left: 24,
-    right: 24,
+    left: 0,
+    right: 0,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    paddingTop: 12,
+    paddingTop: 10,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
   devLabel: {
@@ -231,21 +242,27 @@ const styles = StyleSheet.create({
   },
   devRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    paddingHorizontal: 4,
   },
   devBtn: {
-    flex: 1,
-    height: 40,
+    minWidth: 72,
+    height: 44,
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#D1D5DB',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
+    paddingHorizontal: 6,
   },
   devBtnText: {
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  devBtnPhone: {
+    fontSize: 10,
     color: colors.neutral,
-    fontWeight: '500',
+    marginTop: 1,
   },
 });

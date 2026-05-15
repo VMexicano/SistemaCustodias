@@ -18,6 +18,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { apiClient } from '../../services/api.client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { CustodyOperatorStackParamList } from '../../navigation/types';
+import { tlog, tlogError } from '../../config/reactotron';
 
 type NavProp = StackNavigationProp<CustodyOperatorStackParamList, 'CustodyActiveOrder'>;
 type RouteType = RouteProp<CustodyOperatorStackParamList, 'CustodyActiveOrder'>;
@@ -116,9 +117,13 @@ export default function CustodyActiveOrderScreen(): React.JSX.Element {
         ]);
 
         if (orderRes.status === 'fulfilled') {
+          tlog('order:load', { id: orderId, status: orderRes.value.data.status });
           setOrder(orderRes.value.data);
+        } else {
+          tlogError('order:load', orderRes.reason);
         }
         if (routeRes.status === 'fulfilled') {
+          tlog('route:load', { id: orderId, waypoints: routeRes.value.data.waypoints.length });
           setCustodyRoute(routeRes.value.data);
         }
       } finally {
@@ -155,10 +160,13 @@ export default function CustodyActiveOrderScreen(): React.JSX.Element {
 
   async function executeAction(endpoint: string, body?: Record<string, string>): Promise<void> {
     setActionLoading(true);
+    tlog('action:start', { endpoint, orderId, body });
     try {
       const res = await apiClient.patch<OrderDTO>(`/orders/${orderId}/${endpoint}`, body);
+      tlog('action:ok', { endpoint, newStatus: res.data.status });
       setOrder(res.data);
-    } catch {
+    } catch (err) {
+      tlogError('action:fail', err);
       Alert.alert('Error', 'No se pudo actualizar el estado de la orden.');
     } finally {
       setActionLoading(false);

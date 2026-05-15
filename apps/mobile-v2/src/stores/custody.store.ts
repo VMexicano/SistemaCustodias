@@ -8,16 +8,20 @@ export interface CustodyType {
   valueDeclarationSchema: Record<string, unknown>;
 }
 
+export interface AddressValue {
+  street: string;
+  city: string;
+  state: string;
+  lat?: number;
+  lng?: number;
+}
+
 export interface NewOrderDraft {
   custodyTypeId: string;
   custodyTypeName: string;
   valueDeclarationSchema: Record<string, unknown>;
-  pickupStreet: string;
-  pickupCity: string;
-  pickupState: string;
-  deliveryStreet: string;
-  deliveryCity: string;
-  deliveryState: string;
+  pickupAddress?: AddressValue;
+  deliveryAddress?: AddressValue;
 }
 
 interface CustodyState {
