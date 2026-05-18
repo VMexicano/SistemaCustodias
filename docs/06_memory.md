@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-15 — Debug setup + AddressPickerField (Mapbox autocomplete + GPS + mapa pan-to-select), fix bug mapeo de roles en LoginScreen, fix dual MapboxGL instances en Android.
+> **Última actualización:** 2026-05-18 (sesión 5) — Sprint 14 CustodyEvent Envelope completo: event_catalog (M-055) + order_event (M-056) + seed 15 aplicados. Módulo custody-events: 3 endpoints, CustodyEventService 100% cobertura, 40 tests. ADR-022 + ADR-023. Fix FK tenants→companies en M-056.
 
 ---
 
@@ -28,10 +28,11 @@
 | Scheduler | ✅ Completo | Sprint 6: cron cada minuto, SCHEDULED state, recordatorios 24h/1h/15m |
 | Custody Scheduler | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, 15 tests 100% cobertura, ADR-019 |
 | Compliance | ✅ Sprint 10 | Cadena de custodia JSON + PDF + firmas, SHA-256, redacción por rol, 28 tests 100% cobertura, ADR-020 |
-| Admin Web Custody | ✅ Sprint 11 | 4 páginas custody: CustodyOrdersPage, CustodyOrderDetailPage, CustodyApprovalsPage, CustodyAlertsPage. api.getBlob(), Sidebar sección Custodia, 0 errores TS |
+| Admin Web Custody | ✅ Sprint 11 + fix | 4 páginas custody. CustodyApprovalsPage corregida: campos camelCase (orderNumber, pickupAddress, deliveryAddress, createdAt) + optional chaining en addresses |
 | Custody Routing | ✅ Sprint 13 | POST/GET/PATCH /orders/:id/route, haversine distance, estimación duración, aprobación supervisor, geofence worker mejorado, 22 tests 100% cobertura, ADR-021 |
+| Custody Events | ✅ Sprint 14 | event_catalog por vertical + order_event envelope. GET event-catalog, POST events, GET events. HMAC-SHA256 integrity, Ajv payload validation, anti-replay sequence_no. 40 tests 100% cobertura, ADR-022 + ADR-023 |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
-| Mobile App | ✅ Sprint 14 + debug | CustodyOperatorStack+ClientStack completos, AddressPickerField (Mapbox+GPS+mapa), fix roles LoginScreen, Reactotron instrumentado, bug fix Android Modal/MapboxGL |
+| Mobile App | ✅ Sprint 14 + debug | CustodyOperatorStack+ClientStack completos, AddressPickerField, SessionMenuButton en todos los flujos/estados, fix res.data.id en NewCustodyOrderScreen, app.json launchMode:most-recent (APK rebuild pendiente), Reactotron 9091/4567 |
 | Panel Web | ✅ Completo | Sprint 11 ✅ · AdminLayout + 6 páginas · título dinámico desde vertical config |
 | Infraestructura | ✅ Completo | Sprint 1: monorepo, docker-compose, API base, 22 migraciones, seeds, Jest, Playwright, CI |
 | Tests | 🔲 No iniciado | Estrategia definida |
@@ -41,6 +42,32 @@
 ---
 
 ## Próximas Tareas — Orden Recomendado
+
+### Sprint 14 SistemaCustodias — CustodyEvent Envelope ✅ COMPLETO (2026-05-18)
+```
+[x] EVENTS-001: Migraciones M-055 (event_catalog) + M-056 (order_event ENUM + tabla)
+    [x] event_catalog: UNIQUE(vertical_slug, code), FK custody_types(slug)
+    [x] order_event: ENUM order_event_actor_role, UNIQUE(order_id, sequence_no), FK companies
+    [x] Fix: FK referencia companies(id), no tenants (tabla no existe en este proyecto)
+[x] EVENTS-002: Seed 15 — 20 filas (5 tipos × 4 verticales) idempotente con onConflict().ignore()
+[x] EVENTS-003: Módulo custody-events completo
+    [x] custody-events.types.ts — OrderEventActorRole, EventCatalogRow, OrderEventRow, DTOs
+    [x] custody-events.repository.ts — 5 métodos, getNextSequenceNo con FOR UPDATE
+    [x] custody-events.service.ts — getCatalog, createEvent (Ajv + HMAC + trx), getEvents
+    [x] custody-events.controller.ts + custody-events.routes.ts
+    [x] business-error.ts: ORDER_NOT_ACTIVE_FOR_EVENT, EVENT_TYPE_NOT_FOUND, EVENT_PAYLOAD_INVALID, DUPLICATE_SEQUENCE_NO
+    [x] environment.ts: CUSTODY_EVENT_HMAC_SECRET añadido
+    [x] app.ts: CustodyEventsRepository + CustodyEventService + custodyEventsRoutes wired
+    [x] .env + jest.env.setup.js: CUSTODY_EVENT_HMAC_SECRET con valor dev
+[x] EVENTS-QA-001: 40 tests — CustodyEventService 100% lines/branches/functions ✅
+    [x] getCatalog: ORDER_NOT_FOUND, ORDER_NOT_ACTIVE_FOR_EVENT (it.each), slug resolution, catalog map
+    [x] createEvent: todas las validaciones, happy path con PANIC, integrity_hash calculado por servidor
+    [x] getEvents: paginación, include_evidence flag
+[x] ADR-022: integrity_hash calculado por servidor — no confiar en cliente
+[x] ADR-023: event_catalog keyed por (vertical_slug, code)
+[x] TypeScript: 0 errores
+[x] M-055 + M-056 aplicadas — Seed 15 ejecutada
+```
 
 ### Sprint 12 SistemaCustodias — admin web: assign/reassign + alerts badge ✅ COMPLETO (2026-05-14)
 ```

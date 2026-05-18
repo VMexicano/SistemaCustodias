@@ -110,7 +110,12 @@ export type BusinessErrorCode =
   | 'INVALID_PICKUP_WINDOW'
   // Custody routing
   | 'ROUTE_NOT_FOUND'
-  | 'ORDER_NOT_PLANNABLE';
+  | 'ORDER_NOT_PLANNABLE'
+  // Custody events
+  | 'ORDER_NOT_ACTIVE_FOR_EVENT'
+  | 'EVENT_TYPE_NOT_FOUND'
+  | 'EVENT_PAYLOAD_INVALID'
+  | 'DUPLICATE_SEQUENCE_NO';
 
 const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   PASSENGER_HAS_ACTIVE_TRIP: 409,
@@ -198,6 +203,10 @@ const STATUS_CODE_MAP: Record<BusinessErrorCode, number> = {
   INVALID_PICKUP_WINDOW: 422,
   ROUTE_NOT_FOUND: 404,
   ORDER_NOT_PLANNABLE: 409,
+  ORDER_NOT_ACTIVE_FOR_EVENT: 409,
+  EVENT_TYPE_NOT_FOUND: 404,
+  EVENT_PAYLOAD_INVALID: 422,
+  DUPLICATE_SEQUENCE_NO: 409,
 };
 
 export class BusinessError extends Error {

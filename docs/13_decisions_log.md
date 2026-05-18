@@ -416,6 +416,73 @@ El módulo compliance necesita reportes de cadena de custodia auditables. Los da
 
 ---
 
+## ADR-021: custody-routing — módulo separado, haversine inline, geofence mejorado
+
+**Fecha:** 2026-05-14
+**Estado:** ✅ Vigente
+
+**Contexto:**
+Sprint 13 implementó el módulo de rutas seguras para órdenes de custodia (`custody-routing`).
+
+**Decisión:** Módulo `custody-routing/` separado del módulo de tracking, con cálculo de distancia haversine inline (sin deps externas), endpoints `POST/GET/PATCH /orders/:id/route`, y geofence worker mejorado que reutiliza el cálculo de distancia del módulo.
+
+**Consecuencias:**
+- Haversine inline evita deps externas de geometría para MVP
+- geofence-check.worker.ts usa la función de custody-routing (no duplica lógica)
+- 22 tests, 100% cobertura
+
+---
+
+## ADR-022: CustodyEvent Envelope — integrity_hash calculado por servidor
+
+**Fecha:** 2026-05-18
+**Estado:** ✅ Vigente
+
+**Contexto:**
+El envelope `CustodyEvent` (Sprint 14) incluye `integrity_hash` como mecanismo anti-manipulación para la cadena de custodia legal. El cliente (dispositivo móvil del custodio) podría estar comprometido, por lo que no se puede confiar en que calcule el hash correctamente.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| Cliente calcula el hash | Carga distribuida en dispositivos | No confiable — dispositivo puede estar comprometido o ser un mock |
+| Servidor calcula el hash | Autoridad única confiable, verificable en auditoría | Ligero overhead de CPU por request (aceptable en MVP) |
+| BD calcula con trigger | Transparente para la app | Difícil de testear, acoplamiento fuerte a PostgreSQL |
+
+**Decisión:** El servidor calcula `HMAC-SHA256(canonicalEnvelope, CUSTODY_EVENT_HMAC_SECRET)` donde `canonicalEnvelope` es el payload ordenado por clave antes de `JSON.stringify` (determinístico). El cliente puede enviar `integrity_hash` pero el servidor lo ignora y recalcula siempre. Lo que se almacena en BD es siempre el hash calculado por el servidor.
+
+**Consecuencias:**
+- `CUSTODY_EVENT_HMAC_SECRET` es variable de entorno obligatoria validada con Zod en startup (fail-fast)
+- Monitor Engine (Sprint 15) puede verificar el hash de cualquier evento histórico recalculando con el mismo secret
+- Rotar el secret en producción invalida la verificación de hashes históricos — requiere runbook de rotación
+- `node:crypto` built-in — cero dependencias npm nuevas
+
+---
+
+## ADR-023: event_catalog por (vertical_slug, code) con seed base compartida
+
+**Fecha:** 2026-05-18
+**Estado:** ✅ Vigente
+
+**Contexto:**
+El catálogo de eventos de custodia (`event_catalog`) podría diseñarse como global (un set de eventos para todos los tipos de custodia) o por vertical (cada `custody_type` tiene su propio catálogo). La arquitectura de negocio (`docs/arquitectura-negocio.md §3.3`) especifica `vertical_slug` como clave del catálogo, lo que implica extensibilidad por tipo.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| Catálogo global (sin FK de vertical) | Menos filas en seed, más simple | No permite eventos exclusivos por tipo de custodia |
+| Por `vertical_slug` (FK a `custody_types.slug`) | Extensible por tipo, patrón ADR-004 | 20 filas en seed (4 × 5 para MVP) |
+| Por `custody_type_id` (UUID) | FK fuerte con tipo | Acoplamiento a UUID — difícil de leer en queries y seeds |
+
+**Decisión:** `event_catalog.vertical_slug` como FK a `custody_types.slug`. UNIQUE constraint en `(vertical_slug, code)`. En MVP, los 5 tipos base (`CHECKPOINT`, `PANIC`, `CARGO_STATUS`, `INCIDENT`, `DELIVERY_ATTEMPT`) son idénticos para los 4 verticals — el seed los inserta con `ON CONFLICT DO NOTHING` (idempotente). Agregar un evento exclusivo de un vertical en el futuro = `INSERT INTO event_catalog` sin cambios de código (patrón ADR-004).
+
+**Consecuencias:**
+- Seed 15 inserta 20 filas (5 × 4 verticals)
+- Lookup en service: `order → custody_type.slug → event_catalog WHERE vertical_slug = slug AND active = true`
+- La app descarga el catálogo al iniciar cada orden activa vía `GET /orders/:id/event-catalog`
+- Si dos verticals comparten un evento idéntico, cada uno tiene su propia fila (no FK cruzada entre verticals)
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown

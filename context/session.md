@@ -8,10 +8,40 @@
 
 ## Estado actual
 
-**Sprint:** 14 COMPLETO ✅ + Debug mobile
-**Fecha de sesión:** 2026-05-15
-**Tipo de contexto:** [MOBILE]
-**Objetivo:** Debug setup + AddressPickerField con Mapbox autocomplete/GPS/mapa, fix bug mapeo de roles, fix doble MapboxGL en Android. TypeScript 0 errores.
+**Sprint:** 14 COMPLETO ✅ — Event Catalog + CustodyEvent Envelope
+**Fecha de sesión:** 2026-05-18
+**Tipo de contexto:** [ORDERS]
+**Objetivo:** Implementar módulo custody-events (event_catalog + order_event + endpoints)
+
+**Archivos cargados esta sesión:**
+- `context/project-index.md` (siempre)
+- `context/session.md` (siempre)
+- `docs/06_memory.md` (estado del proyecto)
+- `context/snapshots/custody-events.snapshot.md` (módulo nuevo)
+
+**Tareas completadas:**
+- [x] Plan Sprint 14 diseñado y aprobado (spec/sprint14/)
+- [x] Backend: migraciones M-055 + M-056, seed 15, módulo custody-events completo
+- [x] QA: 40 tests, CustodyEventService 100% cobertura
+- [x] DevOps: M-055 + M-056 aplicadas, seed 15 ejecutada
+- [x] Fix FK: tenants→companies en M-056
+- [x] CUSTODY_EVENT_HMAC_SECRET añadido a .env
+- [x] 6 artefactos de retrospectiva actualizados
+- [x] ADR-022 + ADR-023 documentados
+
+---
+
+## Próxima sesión
+
+**Objetivo:** Continuar con integración mobile del módulo custody-events (pantalla de registro de eventos desde la app del custodio) o siguiente sprint del backlog.
+
+**Contexto recomendado:**
+- `context/snapshots/custody-events.snapshot.md` (módulo recién completado)
+- `context/snapshots/mobile.snapshot.md` (para integración mobile)
+
+**Bloqueos al cierre:**
+- APK rebuild pendiente — ejecutar `expo run:android` en próxima sesión
+- Cambios sin commit: todo el módulo custody-events + migraciones + fixes (pendiente git commit)
 
 ---
 
@@ -223,16 +253,22 @@
 
 ## Próxima sesión
 
-**Objetivo:** Debug E2E completo — flujo cliente crea orden → dispatcher aprueba/asigna → custodio+copiloto confirman → transiciones hasta DELIVERED. Verificar con Reactotron. Si surge algún problema de API, corregirlo.
+**Objetivo:** Reiniciar con Reactotron MCP activo → flujo E2E completo cliente (crear orden → declarar valores → submit) usando get_timeline/get_logs en lugar de screenshots. Luego flujo dispatcher → custodio hasta COMPLETED.
 
 **Cargar en contexto:**
 - `context/snapshots/mobile.snapshot.md` (principal)
 - `context/snapshots/custody-orders.snapshot.md` (para referencia de transiciones)
 
 **Pendientes conocidos:**
+- Reactotron MCP: requiere reinicio de Claude Code para activarse
+- Cambios SIN commitear: `apps/api/src/app.ts`, `apps/mobile-v2/src/config/reactotron.ts`, `.mcp.json`
+- Hamburger menu para perfil: no iniciado
 - Firma digital como TextInput plano — canvas real es trabajo futuro
 - GPS background tracking en CustodyActiveOrderScreen no probado en dispositivo físico
 - FCM push notifications no validado end-to-end
+
+**Bloqueos al cierre:**
+- Ninguno funcional. MCP pendiente de activar con reinicio.
 
 ---
 

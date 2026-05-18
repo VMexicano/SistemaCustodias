@@ -193,6 +193,8 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 12 Custodias] OperatorDTO sin nombre es insuficiente para selectores en UI — al planear cualquier feature con selector de operadores, incluir tarea de JOIN users en findAvailable como dependencia de la tarea frontend
 ✓ [Sprint 12 Custodias] Queries lazy en TanStack Query: usar `enabled: showModal` para evitar requests innecesarios en páginas de detalle con datos opcionales (operadores disponibles solo se cargan cuando el modal se abre)
 ✓ [Sprint 12 Custodias] Validación de mismo ID en selects: cuando un operador no puede ser su propio copiloto, el botón submit debe disabled cuando custodioId === copilotoId — documentar esta regla en el spec del modal
+✓ [Sprint 14 Custodias] tenant_id FK en migraciones: en este proyecto tenant_id referencia companies(id), NO tenants(id) — la tabla tenants no existe. Siempre verificar contra \d custody_orders (que tiene la FK correcta: custody_orders_tenant_id_foreign → companies.id)
+✓ [Sprint 14 Custodias] Variables de entorno de secretos nuevos: cuando se añade un secret a environment.ts (HMAC, API key, etc.), la misma tarea DEBE incluir: (1) agregarlo a apps/api/.env con valor dev, (2) agregarlo a apps/api/jest.env.setup.js con valor ≥32 chars — si se omite, las migraciones y los tests fallan en la primera ejecución
 ```
 
 ### Checklist de completitud por tarea — campos adicionales (Sprint 4+)

@@ -33,6 +33,8 @@ const envSchema = z
     FCM_PROJECT_ID: z.string().optional(),
     FCM_CLIENT_EMAIL: z.string().optional(),
     FCM_PRIVATE_KEY: z.string().optional(),
+    // Custody events — HMAC secret for integrity_hash (ADR-022)
+    CUSTODY_EVENT_HMAC_SECRET: z.string().min(32, 'CUSTODY_EVENT_HMAC_SECRET must be at least 32 characters'),
   })
   .refine(
     (data) =>

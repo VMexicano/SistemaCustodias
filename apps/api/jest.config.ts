@@ -49,6 +49,10 @@ const config: Config = {
     '!src/modules/compliance/compliance.repository.ts',
     '!src/modules/compliance/compliance.controller.ts',
     '!src/modules/compliance/compliance.routes.ts',
+    // custody-events: repository/controller/routes are integration-tested only
+    '!src/modules/custody-events/custody-events.repository.ts',
+    '!src/modules/custody-events/custody-events.controller.ts',
+    '!src/modules/custody-events/custody-events.routes.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],

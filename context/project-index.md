@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-14 — Sprint 14 completado. UI routing: CustodyOperatorStack (mobile) + sección ruta en CustodyOrderDetailPage (web). GET /orders/my para custodio/copiloto. 14 tests mobile. TypeScript 0 errores.
+> Última actualización: 2026-05-18 — Sprint 14 (CustodyEvent Envelope) completado. event_catalog (M-055) + order_event (M-056) + seed 15 aplicados. Módulo custody-events: GET /orders/:id/event-catalog, POST /orders/:id/events, GET /orders/:id/events. CustodyEventService 100% cobertura. ADR-022 + ADR-023.
 
 ---
 
@@ -66,6 +66,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 11 | `custody-scheduler` | ✅ Sprint 9 | Recordatorios 24h/1h/15m + dispatch alerts, PATCH/DELETE /orders/:id/schedule, cron + FOR UPDATE SKIP LOCKED |
 | 12 | `admin` | ✅ Sprint 12 | Dashboard web: 4 páginas custody + assign/reassign modal + alerts badge + operator names via JOIN |
 | 13 | `compliance` | ✅ Sprint 10 | Cadena de custodia, firmas digitales, reportes auditables + PDF, SHA-256, 28 tests |
+| 14 | `custody-events` | ✅ Sprint 14 | event_catalog por vertical, CustodyEvent envelope, HMAC-SHA256 integrity_hash, Ajv payload validation, 40 tests 100% |
 
 ## Migraciones aplicadas
 
@@ -86,7 +87,9 @@ M-050      alter_companies_add_tenant_id        ✅ Sprint 1
 M-051      alter_user_roles_add_custody_check   ✅ Sprint 1
 M-052      notifications                        ✅ Sprint 7
 M-053      custody_scheduled_reminders          ✅ Sprint 9
-M-054      custody_routes                       ⏳ Pendiente (Docker requerido)
+M-054      custody_routes                       ✅ Sprint 13
+M-055      event_catalog                        ✅ Sprint 14
+M-056      order_event (ENUM + tabla)           ✅ Sprint 14
 ```
 
 ---
@@ -272,6 +275,28 @@ notifications (
 )
 ```
 
+-- Catálogo de eventos por vertical (ADR-023)
+event_catalog (
+  id UUID PK, vertical_slug VARCHAR(50) FK→custody_types(slug),
+  code VARCHAR(50), label VARCHAR(100),
+  requires_photo BOOL, requires_audio BOOL, requires_signature BOOL,
+  payload_schema JSONB, interval_minutes INT nullable, active BOOL,
+  created_at TIMESTAMPTZ,
+  UNIQUE(vertical_slug, code)
+)
+
+-- Registro inmutable de eventos de custodia (append-only)
+order_event (
+  id UUID PK, order_id UUID FK→custody_orders, tenant_id UUID FK→companies,
+  event_type VARCHAR(50), sequence_no INT,
+  actor_id UUID FK→users nullable, actor_role ENUM(custodio,copiloto,supervisor,system),
+  app_timestamp TIMESTAMPTZ, auto_timestamp TIMESTAMPTZ nullable,
+  location JSONB, evidence JSONB nullable, payload JSONB, device JSONB,
+  integrity_hash VARCHAR(64), created_at TIMESTAMPTZ,
+  UNIQUE(order_id, sequence_no)
+)
+```
+
 ---
 
 ## Reglas de negocio críticas
@@ -314,6 +339,8 @@ notifications (
 | ADR-019 | custody-scheduler: cron cada minuto + custody_scheduled_reminders + FOR UPDATE SKIP LOCKED | ✅ Vigente |
 | ADR-020 | compliance: reporte on-demand + node:crypto SHA-256 + pdfkit | ✅ Vigente |
 | ADR-021 | custody-routing: haversine polyline + AVG_SPEED 60kmh + geofence fallback a ruta planificada | ✅ Vigente |
+| ADR-022 | integrity_hash calculado por servidor (HMAC-SHA256) — no confiar en valor del cliente | ✅ Vigente |
+| ADR-023 | event_catalog keyed por (vertical_slug, code) — extensible por vertical sin cambios de código | ✅ Vigente |
 
 ---
 

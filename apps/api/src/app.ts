@@ -125,6 +125,9 @@ import { complianceRoutes } from './modules/compliance/compliance.routes.js';
 import { CustodyRoutingRepository } from './modules/custody-routing/custody-routing.repository.js';
 import { CustodyRoutingService } from './modules/custody-routing/custody-routing.service.js';
 import { custodyRoutingRoutes } from './modules/custody-routing/custody-routing.routes.js';
+import { CustodyEventsRepository } from './modules/custody-events/custody-events.repository.js';
+import { CustodyEventService } from './modules/custody-events/custody-events.service.js';
+import { custodyEventsRoutes } from './modules/custody-events/custody-events.routes.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -207,6 +210,14 @@ export async function buildApp() {
         statusCode: 500,
       },
     });
+  });
+
+  // React Native Axios computes Content-Length as JS string length (UTF-16 code units)
+  // instead of UTF-8 byte length, causing Fastify to reject bodies with multi-byte chars
+  // (e.g. ñ, ó in Mexican addresses). Deleting the header before the body parser sees it
+  // skips the check entirely — Fastify then reads until the connection closes, which is safe.
+  app.addHook('onRequest', async (request) => {
+    delete (request.headers as Record<string, unknown>)['content-length'];
   });
 
   // ---------------------------------------------------------------------------
@@ -543,6 +554,23 @@ export async function buildApp() {
   await app.register(custodyRoutingRoutes, {
     prefix: '/orders',
     routingService: custodyRoutingService,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Dependency wiring — custody-events module (Sprint 14)
+  // ---------------------------------------------------------------------------
+
+  const custodyEventsRepo = new CustodyEventsRepository(db);
+  const custodyEventService = new CustodyEventService(
+    custodyEventsRepo,
+    custodyOrdersRepo,
+    custodyNotificationsQueue,
+    env.CUSTODY_EVENT_HMAC_SECRET,
+    db,
+  );
+  await app.register(custodyEventsRoutes, {
+    prefix: '/orders',
+    service: custodyEventService,
   });
 
   // Register orders routes now that both notification and payment queues are initialized

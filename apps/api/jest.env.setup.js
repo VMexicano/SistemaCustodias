@@ -30,6 +30,7 @@ const defaults = {
   LOG_LEVEL: 'error',
   OTP_PROVIDER: 'log',
   STRIPE_SECRET_KEY: 'sk_test_placeholder_for_unit_tests_only',
+  CUSTODY_EVENT_HMAC_SECRET: 'test-hmac-secret-minimum-32-characters-for-unit-tests',
 };
 
 for (const [key, value] of Object.entries(defaults)) {
