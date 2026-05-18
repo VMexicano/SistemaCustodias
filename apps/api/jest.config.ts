@@ -53,6 +53,11 @@ const config: Config = {
     '!src/modules/custody-events/custody-events.repository.ts',
     '!src/modules/custody-events/custody-events.controller.ts',
     '!src/modules/custody-events/custody-events.routes.ts',
+    // monitor-engine: infrastructure files are integration-tested only (Sprint 15)
+    '!src/modules/monitor-engine/monitor-engine.repository.ts',
+    '!src/modules/monitor-engine/monitor-engine.queue.ts',
+    '!src/modules/monitor-engine/monitor-engine.worker.ts',
+    '!src/shared/gps/mock-gps.adapter.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],

@@ -2,7 +2,7 @@
 
 > Este documento se actualiza con cada sesión de trabajo. Refleja el estado actual real del proyecto, lo que está en progreso, y lo que viene a continuación.
 >
-> **Última actualización:** 2026-05-18 (sesión 5) — Sprint 14 CustodyEvent Envelope completo: event_catalog (M-055) + order_event (M-056) + seed 15 aplicados. Módulo custody-events: 3 endpoints, CustodyEventService 100% cobertura, 40 tests. ADR-022 + ADR-023. Fix FK tenants→companies en M-056.
+> **Última actualización:** 2026-05-18 (sesión 5) — Sprint 15 Monitor Engine completo. IGpsProvider + MockGpsAdapter + MonitorEngine (4 checks: timestamp delta, integrity hash, mock GPS). BullMQ event-driven. ADR-024 + ADR-025. 30 tests 100% cobertura.: event_catalog (M-055) + order_event (M-056) + seed 15 aplicados. Módulo custody-events: 3 endpoints, CustodyEventService 100% cobertura, 40 tests. ADR-022 + ADR-023. Fix FK tenants→companies en M-056.
 
 ---
 
@@ -31,6 +31,7 @@
 | Admin Web Custody | ✅ Sprint 11 + fix | 4 páginas custody. CustodyApprovalsPage corregida: campos camelCase (orderNumber, pickupAddress, deliveryAddress, createdAt) + optional chaining en addresses |
 | Custody Routing | ✅ Sprint 13 | POST/GET/PATCH /orders/:id/route, haversine distance, estimación duración, aprobación supervisor, geofence worker mejorado, 22 tests 100% cobertura, ADR-021 |
 | Custody Events | ✅ Sprint 14 | event_catalog por vertical + order_event envelope. GET event-catalog, POST events, GET events. HMAC-SHA256 integrity, Ajv payload validation, anti-replay sequence_no. 40 tests 100% cobertura, ADR-022 + ADR-023 |
+| Monitor Engine | ✅ Sprint 15 | IGpsProvider + MockGpsAdapter + MonitorEngine. 4 checks anti-fraude: timestamp delta >3min, integrity_hash mismatch, mock GPS. BullMQ event-driven. CAS auto_timestamp. 30 tests 100% cobertura, ADR-024 + ADR-025 |
 | Admin | ✅ Completo | Sprint 6 + hotfix 2026-04-23: trips retorna array estructurado con origin/destinations, coords numéricas |
 | Mobile App | ✅ Sprint 14 + debug | CustodyOperatorStack+ClientStack completos, AddressPickerField, SessionMenuButton en todos los flujos/estados, fix res.data.id en NewCustodyOrderScreen, app.json launchMode:most-recent (APK rebuild pendiente), Reactotron 9091/4567 |
 | Panel Web | ✅ Completo | Sprint 11 ✅ · AdminLayout + 6 páginas · título dinámico desde vertical config |
@@ -42,6 +43,25 @@
 ---
 
 ## Próximas Tareas — Orden Recomendado
+
+### Sprint 15 SistemaCustodias — Monitor Engine ✅ COMPLETO (2026-05-18)
+```
+[x] MON-001: IGpsProvider interface + MockGpsAdapter + MonitorRepository (CAS auto_timestamp)
+[x] MON-002: MonitorEngine service — 4 checks anti-fraude
+    [x] checkTimestampDelta: |auto_ts - app_ts| > 3min → alerta 'tamper'
+    [x] checkIntegrityHash: recalcula HMAC-SHA256 → mismatch → alerta 'tamper'
+    [x] checkMockLocation: device.mock_location_detected → alerta 'custom'
+    [x] GPS Provider error no-fatal → continúa con otros checks
+[x] MON-003: BullMQ queue 'monitor-engine' + worker (concurrency 5)
+    [x] CustodyEventService.createEvent() encola job post-commit (6to param monitorQueue)
+    [x] app.ts wired: MockGpsAdapter, MonitorRepository, MonitorEngine, worker
+    [x] jest.config.ts: 4 exclusiones de cobertura unitaria
+    [x] custody-events.service.test.ts: mockMonitorQueue añadido
+[x] MON-QA-001: 30 tests — MonitorEngine.service.ts 100% lines/branches ✅
+[x] ADR-024: CAS en auto_timestamp (UPDATE WHERE IS NULL)
+[x] ADR-025: MonitorEngine event-driven (no cron)
+[x] TypeScript: 0 errores · Tests totales custody-events + monitor-engine: 70/70
+```
 
 ### Sprint 14 SistemaCustodias — CustodyEvent Envelope ✅ COMPLETO (2026-05-18)
 ```

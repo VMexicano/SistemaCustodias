@@ -1,220 +1,293 @@
-# Design — Sprint 15: Backoffice Enrichment + Clone Kit
+# Design — Sprint 15: Monitor Engine
 
-**Fecha:** 2026-04-27
-**Sprint:** 15
-
----
-
-## Estructura de cambios
+## Arquitectura al finalizar el sprint
 
 ```
-apps/web/src/
-├── pages/
-│   ├── TripsPage.tsx           ← modificar: agregar tabs Temperatura + Custodia al modal
-│   └── VerticalesPage.tsx      ← modificar: agregar botón Editar + modal editor
-└── components/ui/
-    └── (sin nuevos componentes — usa Modal y Badge existentes)
-
-docs/
-└── VERTICAL_CLONE_GUIDE.md     ← nuevo
-
-apps/api/seeds/templates/
-└── vertical.template.ts        ← nuevo
-
-.env.vertical.example           ← nuevo (raíz del monorepo)
-```
-
----
-
-## Trip Detail Modal — extensión de tabs
-
-El modal existente en `TripsPage.tsx` tiene estructura de tabs. Se agregan 2 tabs condicionales.
-
-### Lógica de tabs activos
-```typescript
-// Solo mostrar tab si hay datos
-const [hasTemperature, setHasTemperature] = useState(false);
-const [hasCustody, setHasCustody] = useState(false);
-
-// Al abrir el modal para un viaje
-useEffect(() => {
-  if (!selectedTrip) return;
-  // Verificación lazy: hacer ambas queries
-  api.get<{ readings: unknown[] }>(`/trips/${selectedTrip.id}/temperature`)
-    .then(r => setHasTemperature(r.readings.length > 0))
-    .catch(() => {});
-  api.get<{ events: unknown[] }>(`/trips/${selectedTrip.id}/custody`)
-    .then(r => setHasCustody(r.events.length > 0))
-    .catch(() => {});
-}, [selectedTrip]);
-
-// Tabs: [...existentes, hasTemperature && 'temperatura', hasCustody && 'custodia'].filter(Boolean)
-```
-
-### Tab Temperatura (Recharts)
-```typescript
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
-
-// Data shape para Recharts
-const chartData = readings.map(r => ({
-  time: new Date(r.recorded_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
-  celsius: r.celsius,
-}));
-
-<LineChart width={500} height={250} data={chartData}>
-  <CartesianGrid strokeDasharray="3 3" />
-  <XAxis dataKey="time" />
-  <YAxis domain={['auto', 'auto']} unit="°C" />
-  <Tooltip formatter={(v) => [`${v}°C`, 'Temperatura']} />
-  {setpoints && <ReferenceLine y={setpoints.min_celsius} stroke="blue" strokeDasharray="3 3" label="Min" />}
-  {setpoints && <ReferenceLine y={setpoints.max_celsius} stroke="red" strokeDasharray="3 3" label="Max" />}
-  <Line type="monotone" dataKey="celsius" stroke="#2E75B6" dot={false} />
-</LineChart>
-
-// Summary cards
-<div className="grid grid-cols-4 gap-2 mt-3">
-  <SummaryCard label="Mínima" value={`${summary.min}°C`} />
-  <SummaryCard label="Máxima" value={`${summary.max}°C`} />
-  <SummaryCard label="Promedio" value={`${summary.avg.toFixed(1)}°C`} />
-  <SummaryCard label="Fuera de rango" value={summary.out_of_range_count} variant={summary.out_of_range_count > 0 ? 'red' : 'green'} />
-</div>
-```
-
-### Tab Custodia (timeline)
-```typescript
-// Timeline vertical de eventos
-events.map((ev, i) => (
-  <div key={ev.id} className="flex gap-3">
-    <div className="flex flex-col items-center">
-      <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-bold">
-        {ev.sequence}
-      </div>
-      {i < events.length - 1 && <div className="w-0.5 flex-1 bg-gray-200 my-1" />}
-    </div>
-    <div className="pb-4">
-      <div className="flex items-center gap-2">
-        <Badge variant={ev.event_type === 'delivery' ? 'green' : 'blue'} label={EVENT_LABELS[ev.event_type]} />
-        <span className="text-xs text-gray-400">{formatDate(ev.occurred_at)}</span>
-      </div>
-      <p className="text-sm text-gray-700 mt-1">{ev.actor_name}</p>
-      {ev.notes && <p className="text-xs text-gray-500 mt-0.5">{ev.notes}</p>}
-      {ev.photo_url && (
-        <a href={ev.photo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 mt-1 block">
-          📷 Ver foto
-        </a>
-      )}
-    </div>
-  </div>
-))
+POST /orders/:id/events
+        │
+        ▼
+CustodyEventService.createEvent()
+        │
+        ├─── db.transaction()
+        │       ├── getNextSequenceNo (FOR UPDATE)
+        │       └── repo.create() → order_event row (auto_timestamp = NULL)
+        │
+        ├─── if PANIC: alertsQueue.add('create-alert', ...)   [ya existía]
+        │
+        └─── monitorQueue.add('process-event', { eventId, orderId })  [NUEVO Sprint 15]
+                                │
+                                ▼
+                    monitor-engine.worker.ts
+                                │
+                                ▼
+                    MonitorEngine.processEvent(eventId)
+                                │
+                    ┌───────────┼───────────────────┐
+                    ▼           ▼                   ▼
+              [1] fillAutoTs  [2] checkDelta   [3] checkHash   [4] checkMock
+                    │               │                │               │
+              gpsProvider     |delta| > 3min   recalc HMAC    device.mock=true
+              .getAutoTs()         │                │               │
+                    │          tamper alert    tamper alert    custom alert
+              repo.updateAutoTs                                      │
+              (CAS: WHERE IS NULL)                                   │
+                                                    └───────────────►alertsQueue
 ```
 
 ---
 
-## Vertical Editor Modal
+## Estructura de directorios
+
+```
+apps/api/src/
+├── modules/
+│   └── monitor-engine/                        [NUEVO]
+│       ├── monitor-engine.types.ts
+│       ├── monitor-engine.repository.ts
+│       ├── monitor-engine.service.ts          (MonitorEngine)
+│       ├── monitor-engine.queue.ts
+│       └── monitor-engine.worker.ts
+├── shared/
+│   └── gps/                                   [NUEVO]
+│       ├── gps-provider.interface.ts          (IGpsProvider)
+│       └── mock-gps.adapter.ts               (MockGpsAdapter)
+```
+
+---
+
+## Interfaces TypeScript
+
+### IGpsProvider
 
 ```typescript
-interface VerticalEditForm {
-  name: string;
-  description: string;
-  features: {
-    scheduling: boolean;
-    multiStop: boolean;
-    b2bAccounts: boolean;
-    cargoDeclaration: boolean;
-    temperatureLog: boolean;
-    chainOfCustody: boolean;
-    pricingModel: 'per_km_min' | 'fixed_rate' | 'per_weight_km';
-  };
+// apps/api/src/shared/gps/gps-provider.interface.ts
+
+export interface IGpsProvider {
+  getAutoTimestamp(orderId: string, vehicleId: string | null): Promise<Date>;
 }
 ```
 
-### UI del modal editor
-```
-┌────────────────────────────────┐
-│ Editar vertical: Taxi          │
-├────────────────────────────────┤
-│ Nombre          [Taxi        ] │
-│ Descripción     [TextArea    ] │
-├────────────────────────────────┤
-│ Features                       │
-│ Viajes programados    [●  ]   │
-│ Múltiples paradas     [○  ]   │
-│ Cuentas B2B           [○  ]   │
-│ Declaración de carga  [○  ]   │
-│ Log de temperatura    [○  ]   │
-│ Cadena de custodia    [○  ]   │
-├────────────────────────────────┤
-│ Modelo de pricing              │
-│ [▼ Por km + minuto          ] │
-├────────────────────────────────┤
-│ [Cancelar]      [Guardar]     │
-└────────────────────────────────┘
-```
+### MockGpsAdapter
 
-### Contrato de PATCH (ya existe en Sprint 10)
 ```typescript
-PATCH /admin/verticals/:id
-{ name?: string, description?: string, features?: Partial<VerticalFeatures> }
-→ 200 { id, slug, name, description, features, updated_at }
+// apps/api/src/shared/gps/mock-gps.adapter.ts
+
+export class MockGpsAdapter implements IGpsProvider {
+  async getAutoTimestamp(orderId: string, _vehicleId: string | null): Promise<Date> {
+    // Simula proveedor GPS: offset de 0-120 segundos respecto a now
+    // En producción, WinlogAdapter haría HTTP call al proveedor
+    const offsetMs = Math.floor(Math.random() * 120_000);
+    return new Date(Date.now() - offsetMs);
+  }
+}
 ```
 
----
+### MonitorRepository
 
-## Clone Starter Kit — estructura de archivos
-
-### docs/VERTICAL_CLONE_GUIDE.md (outline)
-```
-# Vertical Clone Guide
-
-## Prerrequisitos
-## Paso 1 — Clonar el repositorio
-## Paso 2 — Configurar variables de entorno
-## Paso 3 — Levantar el stack Docker
-## Paso 4 — Ejecutar migraciones
-## Paso 5 — Crear el seed de tu vertical
-## Paso 6 — Configurar VERTICAL_SLUG
-## Paso 7 — Configurar features del vertical
-## Paso 8 — Requisitos de conductor específicos
-## Paso 9 — Verificar GET /config
-## Paso 10 — Compilar APK Android
-## Referencia — Verticales existentes (taxi, custody, cold-chain)
-## Checklist final de verificación
-```
-
-### apps/api/seeds/templates/vertical.template.ts (outline)
 ```typescript
-// Plantilla comentada para crear un nuevo vertical
-// 1. Copiar este archivo como seeds/09_mi_vertical.ts
-// 2. Reemplazar los valores marcados con [CAMBIAR]
-// 3. Ejecutar: pnpm knex seed:run --specific=09_mi_vertical.ts
+// apps/api/src/modules/monitor-engine/monitor-engine.repository.ts
 
-export async function seed(knex: Knex): Promise<void> {
-  // Insertar vertical
-  // Insertar trip_types para el vertical
-  // Insertar document_requirements con vertical_id
-  // Insertar empresa de ejemplo
+export interface MonitorEventRow {
+  id: string;
+  order_id: string;
+  actor_id: string | null;
+  actor_role: string;
+  event_type: string;
+  app_timestamp: Date;
+  auto_timestamp: Date | null;
+  location: Record<string, unknown>;
+  payload: Record<string, unknown>;
+  device: { mock_location_detected: boolean; [key: string]: unknown };
+  integrity_hash: string;
+}
+
+export class MonitorRepository {
+  constructor(private readonly db: Database) {}
+
+  async findEventById(eventId: string): Promise<MonitorEventRow | null>
+
+  // CAS: solo escribe si auto_timestamp IS NULL
+  async updateAutoTimestamp(eventId: string, ts: Date): Promise<void>
+    // UPDATE order_event SET auto_timestamp = ? WHERE id = ? AND auto_timestamp IS NULL
+}
+```
+
+### MonitorEngine
+
+```typescript
+// apps/api/src/modules/monitor-engine/monitor-engine.service.ts
+
+export class MonitorEngine {
+  constructor(
+    private readonly repo: MonitorRepository,
+    private readonly gpsProvider: IGpsProvider,
+    private readonly alertsQueue: Queue,
+    private readonly hmacSecret: string,
+  ) {}
+
+  async processEvent(eventId: string): Promise<void>
+    // 1. findEventById → null → log + return (order may be deleted)
+    // 2. getAutoTimestamp(order_id, null) → updateAutoTimestamp(CAS)
+    // 3. checkTimestampDelta(app_timestamp, autoTs)
+    // 4. checkIntegrityHash(event)
+    // 5. checkMockLocation(event)
+    // Each check: if alert condition → alertsQueue.add('create-alert', {...}) [outside any trx]
+    // GPS Provider error: catch → log → continue with remaining checks
+
+  private async checkTimestampDelta(
+    eventId: string, orderId: string, actorId: string | null,
+    appTs: Date, autoTs: Date,
+  ): Promise<void>
+    // |autoTs.getTime() - appTs.getTime()| > 3 * 60 * 1000
+    // → alertsQueue.add('create-alert', { type: 'tamper', orderId, actorId,
+    //     description: `Timestamp delta ${deltaSeconds}s exceeds 3 min threshold` })
+
+  private async checkIntegrityHash(event: MonitorEventRow): Promise<void>
+    // Reconstruir CreateCustodyEventPayload desde el row
+    // recalcular HMAC-SHA256 con hmacSecret
+    // si !== event.integrity_hash → alertsQueue.add('create-alert', { type: 'tamper', ... })
+
+  private async checkMockLocation(event: MonitorEventRow): Promise<void>
+    // if event.device.mock_location_detected === true
+    // → alertsQueue.add('create-alert', { type: 'custom', description: 'mock_location_detected', ... })
+}
+```
+
+### MonitorJobData
+
+```typescript
+// apps/api/src/modules/monitor-engine/monitor-engine.types.ts
+
+export interface MonitorJobData {
+  eventId: string;
+  orderId: string;
 }
 ```
 
 ---
 
-## Dependencias verificadas
+## BullMQ Queue y Worker
 
-| Librería | Workspace | Estado |
-|---|---|---|
-| recharts | apps/web | Verificar en package.json antes de implementar |
-| @tanstack/react-query | apps/web | ✅ existe |
-| Modal, Badge (ui) | apps/web/src/components/ui | ✅ creados en Sprint 11 |
+```typescript
+// apps/api/src/modules/monitor-engine/monitor-engine.queue.ts
+import { Queue } from 'bullmq';
+export function createMonitorEngineQueue(connection: Redis): Queue<MonitorJobData> {
+  return new Queue('monitor-engine', {
+    connection,
+    defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+  });
+}
 
-Si recharts no está: `pnpm add recharts --filter web`
+// apps/api/src/modules/monitor-engine/monitor-engine.worker.ts
+import { Worker } from 'bullmq';
+export function registerMonitorEngineWorker(
+  monitorEngine: MonitorEngine,
+  connection: Redis,
+): Worker {
+  return new Worker<MonitorJobData>(
+    'monitor-engine',
+    async (job) => {
+      await monitorEngine.processEvent(job.data.eventId);
+    },
+    { connection, concurrency: 5 },
+  );
+}
+```
+
+---
+
+## Cambio en CustodyEventService
+
+```typescript
+// Añadir monitorQueue como 6to parámetro del constructor
+export class CustodyEventService {
+  constructor(
+    private readonly repo: CustodyEventsRepository,
+    private readonly ordersRepo: CustodyOrdersRepository,
+    private readonly alertsQueue: Queue,
+    private readonly hmacSecret: string,
+    private readonly db: Knex,
+    private readonly monitorQueue: Queue,          // NUEVO
+  ) {}
+
+  async createEvent(...): Promise<OrderEventDTO> {
+    // ... lógica existente ...
+
+    // 8. Side effects fuera de transacción (ADR-003)
+    if (data.event_type === 'PANIC') {
+      await this.alertsQueue.add('create-alert', { ... });
+    }
+
+    // 9. Encolar verificación de Monitor Engine (NUEVO)
+    await this.monitorQueue.add('process-event', {
+      eventId: event.id,
+      orderId,
+    });
+
+    return toEventDTO(event, true);
+  }
+}
+```
+
+---
+
+## Wiring en app.ts
+
+```typescript
+// Nuevas instancias a crear:
+const mockGpsAdapter = new MockGpsAdapter();
+const monitorEngineQueue = createMonitorEngineQueue(redisConnection);
+const monitorRepo = new MonitorRepository(db);
+const monitorEngine = new MonitorEngine(
+  monitorRepo,
+  mockGpsAdapter,
+  alertsQueue,
+  env.CUSTODY_EVENT_HMAC_SECRET,
+);
+registerMonitorEngineWorker(monitorEngine, redisConnection);
+
+// Actualizar CustodyEventService para recibir monitorEngineQueue como 6to arg
+```
+
+---
+
+## Variables de entorno nuevas
+
+Ninguna — se reutiliza `CUSTODY_EVENT_HMAC_SECRET` para la re-verificación del hash.
 
 ---
 
 ## ADRs aplicables
 
-| ADR | Aplicación |
+| ADR | Decisión |
 |---|---|
-| ADR-040 | GET /trips/:id/temperature — datos de la hypertable para chart |
-| ADR-041 | GET /trips/:id/custody — log append-only para timeline |
-| ADR-045 | Clone Kit como documentación estática |
-| ADR-036 | PATCH /admin/verticals/:id — editar features JSONB |
+| ADR-003 | Side-effects fuera de transacciones → BullMQ |
+| ADR-022 | integrity_hash calculado por servidor con HMAC-SHA256 |
+| ADR-024 (nueva) | CAS en order_event.auto_timestamp: UPDATE WHERE auto_timestamp IS NULL |
+| ADR-025 (nueva) | MonitorEngine event-driven (no cron): un job por evento, latencia mínima |
+
+### ADR-024 — CAS en order_event.auto_timestamp
+
+**Fecha:** 2026-05-18 · **Estado:** Vigente · **Área:** persistence
+
+**Contexto:** `order_event` es append-only por diseño de cadena de custodia, pero `auto_timestamp` llega por canal separado (GPS Provider) y no puede incluirse en el INSERT original.
+
+**Decisión:** Permitir un único UPDATE condicional: `UPDATE order_event SET auto_timestamp = ? WHERE id = ? AND auto_timestamp IS NULL`. Si ya tiene valor, la operación es no-op. El registro no puede ser alterado retroactivamente.
+
+**Consecuencias:**
+- Facilita: completar el registro sin violar la inmutabilidad semántica
+- Complica: requiere que el Monitor Engine maneje el caso de timestamp ya presente
+- Criterio de revisión: si se necesita corregir un auto_timestamp erróneo, requiere intervención manual de DBA
+
+### ADR-025 — MonitorEngine event-driven (no cron)
+
+**Fecha:** 2026-05-18 · **Estado:** Vigente · **Área:** architecture
+
+**Contexto:** La arquitectura original describe un "Monitor Engine (ciclo 15 min)". Para MVP con MockGpsAdapter, un cron sería overhead innecesario.
+
+**Decisión:** MonitorEngine se activa por BullMQ job encolado en `CustodyEventService.createEvent()`. Un job por evento. Latencia típica: < 5 segundos.
+
+**Consecuencias:**
+- Facilita: latencia mínima para detección de fraude, sin scan periódico
+- Complica: si el GPS Provider real es push (no pull), el modelo cambia
+- Criterio de revisión: cuando se integre WinlogAdapter real, evaluar si el modelo debe cambiar a pub-sub

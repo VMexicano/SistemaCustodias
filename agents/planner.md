@@ -195,6 +195,9 @@ Cada tarea debe cumplir **todos** estos campos antes de que el bucle P2P termine
 ✓ [Sprint 12 Custodias] Validación de mismo ID en selects: cuando un operador no puede ser su propio copiloto, el botón submit debe disabled cuando custodioId === copilotoId — documentar esta regla en el spec del modal
 ✓ [Sprint 14 Custodias] tenant_id FK en migraciones: en este proyecto tenant_id referencia companies(id), NO tenants(id) — la tabla tenants no existe. Siempre verificar contra \d custody_orders (que tiene la FK correcta: custody_orders_tenant_id_foreign → companies.id)
 ✓ [Sprint 14 Custodias] Variables de entorno de secretos nuevos: cuando se añade un secret a environment.ts (HMAC, API key, etc.), la misma tarea DEBE incluir: (1) agregarlo a apps/api/.env con valor dev, (2) agregarlo a apps/api/jest.env.setup.js con valor ≥32 chars — si se omite, las migraciones y los tests fallan en la primera ejecución
+✓ [Sprint 15 Custodias] Re-verificación de HMAC en MonitorEngine: el conjunto de campos y su orden deben ser IDÉNTICOS a los que usó el servicio que generó el hash original. Documentar en el spec exactamente qué campos se incluyen y en qué orden — edge case: si el hash original incluyó campos opcionales (como evidence), la re-verificación producirá falso positivo si no los incluye
+✓ [Sprint 15 Custodias] Tests con fecha: para probar checkTimestampDelta, usar `new Date(Date.now() - 4 * 60 * 1000)` (fecha absoluta) en lugar de constantes hardcodeadas — evita flakiness por milisegundos al comparar contra el threshold
+✓ [Sprint 15 Custodias] Cuando un service de un módulo existente recibe un nuevo parámetro en el constructor (ej: monitorQueue), la tarea DEBE especificar actualizar también el test file de ese service — si no se hace, el SUT del test queda con aridad incorrecta y todos los tests fallan
 ```
 
 ### Checklist de completitud por tarea — campos adicionales (Sprint 4+)

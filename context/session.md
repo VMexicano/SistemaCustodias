@@ -8,10 +8,10 @@
 
 ## Estado actual
 
-**Sprint:** 14 COMPLETO ✅ — Event Catalog + CustodyEvent Envelope
+**Sprint:** 15 COMPLETO ✅ — Monitor Engine
 **Fecha de sesión:** 2026-05-18
 **Tipo de contexto:** [ORDERS]
-**Objetivo:** Implementar módulo custody-events (event_catalog + order_event + endpoints)
+**Objetivo:** Implementar Monitor Engine (IGpsProvider, MockGpsAdapter, MonitorEngine fraud detection, BullMQ worker)
 
 **Archivos cargados esta sesión:**
 - `context/project-index.md` (siempre)

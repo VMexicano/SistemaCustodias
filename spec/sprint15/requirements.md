@@ -1,15 +1,8 @@
-# Requirements — Sprint 15: Backoffice Enrichment + Clone Kit
-
-**Fecha:** 2026-04-27
-**Sprint:** 15
-**Tipo:** FEATURE
-**Depende de:** Sprint 14 completo (SP14-QA-001 ✅)
-
----
+# Requirements — Sprint 15: Monitor Engine
 
 ## Objetivo
 
-Completar la visibilidad operacional en el backoffice para los datos específicos de cada vertical (temperatura y custodia en el detalle de viaje), entregar un editor de configuración de vertical en la interfaz admin, y documentar el proceso de clonación del repositorio para que cualquier equipo pueda adaptar la plataforma a un nuevo vertical en menos de 1 día de trabajo.
+Implementar el Monitor Engine de SistemaCustodias: el componente que verifica la autenticidad de cada CustodyEvent registrado. Al recibir un evento, el sistema obtiene un timestamp independiente del proveedor GPS (canal separado al de la app), lo compara contra el timestamp de la app, re-verifica el hash de integridad y detecta GPS falso — emitiendo alertas automáticas al supervisor cuando detecta anomalías.
 
 ---
 
@@ -17,11 +10,14 @@ Completar la visibilidad operacional en el backoffice para los datos específico
 
 | Incluye | Excluye |
 |---|---|
-| Tab "Temperatura" con gráfica en detalle de viaje | Charts en tiempo real (WebSocket) |
-| Tab "Custodia" con timeline de eventos en detalle de viaje | Exportación PDF de cadena de custodia |
-| Editor visual de features JSONB en VerticalesPage | Creación de nuevos verticales desde el UI (PATCH solo, no POST) |
-| VERTICAL_CLONE_GUIDE.md + .env.vertical.example + seed template | CLI generador (scaffolding automático) |
-| Playwright smoke tests para vertical editor + datos en detalle | Tests Detox E2E mobile (Sprint futuro) |
+| `IGpsProvider` interface TypeScript | WinlogAdapter real (requiere contrato con Winlog) |
+| `MockGpsAdapter` para MVP | Integración HTTP con proveedor GPS externo |
+| `MonitorRepository` con CAS en `auto_timestamp` | Endpoints REST del Monitor Engine |
+| `MonitorEngine` service con 4 checks | WebSocket broadcast de alertas de fraude |
+| BullMQ queue `monitor-engine` + worker | Suspensión automática del operador |
+| Wiring en `CustodyEventService.createEvent()` | Reportes regulatorios a SSP/Aseguradora |
+| Alertas de fraude vía AlertEngine existente | Cron de barrido periódico (ADR-025) |
+| Tests MonitorEngine 100% cobertura | Tests de MonitorRepository/worker (integration) |
 
 ---
 
@@ -29,88 +25,80 @@ Completar la visibilidad operacional en el backoffice para los datos específico
 
 | Actor | Interés en este sprint |
 |---|---|
-| Administrador | Ver historial de temperatura y cadena de custodia en detalle de viaje |
-| Operador de negocio | Activar/desactivar features del vertical desde el panel sin deploy |
-| Equipo de desarrollo externo | Clonar el repo y adaptar un nuevo vertical en < 1 día |
-| Arquitecto | Garantizar que el Clone Kit refleja el estado real del código |
+| **Supervisor** | Recibe alertas automáticas cuando se detecta fraude o manipulación |
+| **Sistema (Monitor Engine)** | Verifica autenticidad de cada evento sin intervención humana |
+| **Custodio / Copiloto** | Sus eventos son verificados transparentemente; comportamiento legítimo no afectado |
+| **Cliente corporativo** | Confianza en que la cadena de custodia es verificada automáticamente |
 
 ---
 
 ## Requerimientos funcionales
 
-### RF-1501 — Detalle de viaje: datos de temperatura
-
-**Como** administrador,  
-**quiero** ver las lecturas de temperatura de un viaje cold-chain en el detalle de viaje,  
-**para** verificar que la cadena de frío se mantuvo durante el trayecto.
+### RF-001 — Auto-timestamp por GPS Provider
+**Como** sistema, **quiero** obtener un timestamp independiente del GPS Provider para cada evento registrado, **para** poder compararlo contra el timestamp de la app y detectar manipulación.
 
 **Criterios de aceptación:**
-- [ ] El modal de detalle de viaje en `TripsPage` muestra tab "Temperatura" solo si el viaje tiene lecturas
-- [ ] La tab muestra una gráfica de línea (Recharts LineChart) con el eje X = tiempo y eje Y = celsius
-- [ ] Muestra resumen: min, max, avg y out_of_range_count
-- [ ] Si el viaje no tiene lecturas (`GET /trips/:id/temperature` retorna array vacío), la tab no aparece
-- [ ] La data se carga con `GET /trips/:id/temperature` desde el backoffice
+- [ ] `IGpsProvider.getAutoTimestamp(orderId, vehicleId)` retorna `Promise<Date>`
+- [ ] `MockGpsAdapter` implementa `IGpsProvider` devolviendo un timestamp simulado (0–120s de offset respecto a `app_timestamp`)
+- [ ] `MonitorRepository.updateAutoTimestamp(eventId, ts)` usa patrón CAS: `UPDATE WHERE auto_timestamp IS NULL AND id = ?`
+- [ ] Si `auto_timestamp` ya tiene valor, el UPDATE no lo sobreescribe
+- [ ] `order_event.auto_timestamp` queda poblado tras el procesamiento del job
 
-### RF-1502 — Detalle de viaje: cadena de custodia
-
-**Como** administrador,  
-**quiero** ver la cadena de custodia de un viaje custody en el detalle de viaje,  
-**para** auditar el manejo del bien custodiado y resolver disputas.
+### RF-002 — Detección de manipulación de timestamp
+**Como** supervisor, **quiero** recibir una alerta cuando el timestamp de la app difiere más de 3 minutos del timestamp del GPS, **para** detectar intentos de falsificar el momento de un evento.
 
 **Criterios de aceptación:**
-- [ ] El modal de detalle de viaje muestra tab "Custodia" solo si el viaje tiene eventos
-- [ ] La tab muestra un timeline vertical con: sequence, event_type, actor_name, occurred_at, notas
-- [ ] Si hay `photo_url`, muestra un ícono de foto que el admin puede abrir en nueva pestaña
-- [ ] Si el viaje no tiene eventos (`GET /trips/:id/custody` retorna array vacío), la tab no aparece
+- [ ] Si `|auto_timestamp - app_timestamp| > 3 minutos` → se crea alerta `type: 'tamper'` vía AlertEngine
+- [ ] Si el delta es ≤ 3 minutos → no se crea alerta
+- [ ] La alerta incluye `orderId`, `actorId`, descripción con el delta exacto en segundos
 
-### RF-1503 — Editor de features del vertical
-
-**Como** operador de negocio,  
-**quiero** activar o desactivar features de un vertical desde el panel admin sin necesidad de deploy,  
-**para** controlar qué capacidades están disponibles en cada vertical en producción.
+### RF-003 — Verificación de integridad del hash
+**Como** sistema, **quiero** re-verificar el `integrity_hash` de cada evento usando la misma clave HMAC, **para** detectar si el payload fue alterado después de ser enviado.
 
 **Criterios de aceptación:**
-- [ ] En `VerticalesPage`, cada tarjeta de vertical tiene un botón "Editar"
-- [ ] Al hacer clic abre un modal con toggles (Switch) para cada feature booleana del vertical
-- [ ] El modal también permite editar `name` y `description`
-- [ ] Al guardar se llama `PATCH /admin/verticals/:id` con los features actualizados
-- [ ] El cambio se refleja inmediatamente en la tarjeta (sin recargar página)
-- [ ] Solo los campos booleanos del JSONB se muestran como toggles; `pricingModel` como select
+- [ ] MonitorEngine recalcula HMAC-SHA256 del evento usando `CUSTODY_EVENT_HMAC_SECRET`
+- [ ] Si el hash calculado difiere del almacenado → alerta `type: 'tamper'` con descripción `integrity_hash_mismatch`
+- [ ] Si el hash coincide → no se crea alerta
 
-### RF-1504 — Clone Starter Kit
-
-**Como** desarrollador externo,  
-**quiero** una guía paso a paso para clonar este repositorio y adaptarlo a un nuevo vertical,  
-**para** reducir el tiempo de setup de un nuevo proyecto a menos de 1 día.
+### RF-004 — Detección de GPS simulado
+**Como** supervisor, **quiero** recibir una alerta cuando la app reporta que la ubicación es simulada (mock GPS), **para** detectar custodios que falsifican su posición.
 
 **Criterios de aceptación:**
-- [ ] `docs/VERTICAL_CLONE_GUIDE.md` existe con checklist de pasos numerados
-- [ ] `.env.vertical.example` documenta todas las variables de entorno relevantes al vertical
-- [ ] `apps/api/seeds/templates/vertical.template.ts` es un seed comentado que el clonador copia y adapta
-- [ ] La guía incluye los comandos exactos para ejecutar migraciones + seeds + levantar el stack
-- [ ] La guía incluye la sección "Por vertical" con los pasos específicos de taxi, custody y cold-chain como referencia
+- [ ] Si `event.device.mock_location_detected === true` → alerta `type: 'custom'` con descripción `mock_location_detected`
+- [ ] Si `mock_location_detected === false` → no se crea alerta
+
+### RF-005 — Activación automática por evento
+**Como** sistema, **quiero** que la verificación se active automáticamente en cada evento registrado, **para** que no requiera intervención manual ni cron periódico.
+
+**Criterios de aceptación:**
+- [ ] `CustodyEventService.createEvent()` encola job `{ eventId, orderId }` en `monitor-engine` queue FUERA de la transacción
+- [ ] El worker procesa el job llamando `monitorEngine.processEvent(eventId)`
+- [ ] Si el GPS Provider falla, el error se registra pero NO bloquea ni revierte el evento
 
 ---
 
 ## Requerimientos no funcionales
 
-- Recharts ya debe ser dependencia de `apps/web` (verificar package.json antes de implementar)
-- Las queries `GET /trips/:id/temperature` y `GET /trips/:id/custody` se hacen solo cuando la tab está activa (lazy loading con `enabled: tab === 'temperatura'`)
-- El Clone Kit no genera código — es documentación estática
-- La guía de clonación debe ser verificable: cada paso tiene un comando o acción verificable
+- **Latencia:** El job de monitoreo se encola inmediatamente post-commit; su procesamiento puede ser asíncrono (no bloquea la respuesta HTTP del POST /events)
+- **Resiliencia:** Errores del GPS Provider son no-fatales — el job se completa con log de error, no retry infinito
+- **Testabilidad:** `IGpsProvider` permite sustituir el MockAdapter por cualquier implementación real sin cambios en MonitorEngine
 
 ---
 
 ## Restricciones técnicas
 
-- El editor de features JSONB solo soporta valores booleanos y string (select) — no estructuras JSONB anidadas
-- `PATCH /admin/verticals/:id` ya existe (Sprint 10) — solo se consume desde el nuevo UI
-- Recharts es la librería de gráficas elegida (consistente con el stack React existente; sin D3 directo)
+- `order_event.auto_timestamp` usa patrón CAS: solo se escribe si es NULL (ADR-024)
+- MonitorEngine es event-driven, no cron (ADR-025)
+- Side-effects (alertas) fuera de transacciones (ADR-003)
+- `alert_type` usa valores existentes: `'tamper'` para timestamp/hash, `'custom'` para mock GPS — sin migración de ENUM
+- `CUSTODY_EVENT_HMAC_SECRET` ya existe en env — se reutiliza para re-verificación
 
 ---
 
-## Decisiones pendientes
+## Decisiones pendientes (no bloquean este sprint)
 
-- Exportación PDF de cadena de custodia para fines legales (Sprint futuro — requiere PDF generation)
-- Dashboard analytics por vertical (viajes por tipo, temperatura promedio por ruta) (Sprint futuro)
-- Autenticación multi-empresa en el backoffice (acceso por empresa sin ver todos los viajes) (Sprint futuro)
+| Decisión | Impacto |
+|---|---|
+| Contrato API de Winlog para `getAutoTimestamp` | Definir cuándo se implemente WinlogAdapter real |
+| Umbral configurable de delta (actualmente hardcoded 3 min) | Podría ser config por tenant en el futuro |
+| Política de suspensión automática del operador tras N alertas de fraude | Sprint posterior |

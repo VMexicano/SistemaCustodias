@@ -193,6 +193,10 @@ const mockAlertsQueue = {
   add: jest.fn().mockResolvedValue({ id: 'job-1' }),
 };
 
+const mockMonitorQueue = {
+  add: jest.fn().mockResolvedValue({ id: 'monitor-job-1' }),
+};
+
 // mockTrx is the Knex transaction mock — callable as a function (for table access)
 // and also has .raw for raw queries
 const mockTrx = jest.fn().mockImplementation((_table: string) => ({
@@ -260,6 +264,7 @@ beforeEach(() => {
     mockAlertsQueue as never,
     HMAC_SECRET,
     mockDb as never,
+    mockMonitorQueue as never,
   );
 });
 
@@ -555,6 +560,7 @@ describe('createEvent — integrity_hash', () => {
       mockAlertsQueue as never,
       HMAC_SECRET,
       mockDb as never,
+      mockMonitorQueue as never,
     );
     setupHappyPath({ sequenceNo: 2, eventRow: { sequence_no: 2, integrity_hash: 'b'.repeat(64) } });
 
@@ -591,6 +597,7 @@ describe('createEvent — integrity_hash', () => {
       mockAlertsQueue as never,
       HMAC_SECRET,
       mockDb as never,
+      mockMonitorQueue as never,
     );
     setupHappyPath({ sequenceNo: 1 });
     await service.createEvent('order-uuid-1', 'user-uuid-1', baseCreatePayload);

@@ -483,6 +483,54 @@ El catálogo de eventos de custodia (`event_catalog`) podría diseñarse como gl
 
 ---
 
+## ADR-024: CAS en order_event.auto_timestamp — excepción controlada al append-only
+
+**Fecha:** 2026-05-18
+**Estado:** ✅ Vigente
+
+**Contexto:**
+`order_event` es append-only por diseño (cadena de custodia inmutable). Sin embargo, `auto_timestamp` llega por canal separado del GPS Provider y no puede incluirse en el INSERT original — solo se conoce segundos después, cuando el Monitor Engine procesa el job BullMQ.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| UPDATE condicional (CAS) | Simple, el registro queda completo | Excepción al append-only — requiere documentación explícita |
+| Tabla separada `order_event_gps_timestamps` | Append-only puro | JOIN adicional en todas las queries; complejidad sin beneficio real en MVP |
+| Dejar `auto_timestamp` siempre NULL | Cero cambios de código | Elimina el anti-fraude de doble timestamp — inaceptable para el negocio |
+
+**Decisión:** `UPDATE order_event SET auto_timestamp = ? WHERE id = ? AND auto_timestamp IS NULL`. Patrón CAS (Compare-And-Set). El campo se completa exactamente una vez; si ya tiene valor, la operación es no-op. El registro no puede alterarse retroactivamente.
+
+**Consecuencias:**
+- Facilita: completar el registro sin romper la inmutabilidad semántica
+- Complica: si el GPS Provider retorna un valor erróneo, corregirlo requiere intervención manual de DBA
+- Criterio de revisión: si se necesita corrección masiva de timestamps, evaluar tabla separada
+
+---
+
+## ADR-025: MonitorEngine event-driven (no cron) en MVP
+
+**Fecha:** 2026-05-18
+**Estado:** ✅ Vigente
+
+**Contexto:**
+La arquitectura de negocio (`docs/arquitectura-negocio.md §3.4`) describe un "Monitor Engine (ciclo 15 min)". Para MVP con `MockGpsAdapter`, un cron periódico sería overhead innecesario y añadiría latencia de hasta 15 min para detectar fraude.
+
+**Opciones consideradas:**
+| Opción | Pros | Contras |
+|---|---|---|
+| Cron cada 15 min (node-cron) | Fiel al diseño original | Latencia de detección: hasta 15 min; scan de toda la tabla |
+| Event-driven (BullMQ job por evento) | Latencia < 5s; sin scan periódico | Asume que el GPS Provider puede responder en modo pull |
+| Push del GPS Provider (webhook) | Latencia mínima, modelo real | Requiere contrato con proveedor externo — no disponible en MVP |
+
+**Decisión:** MonitorEngine se activa por BullMQ job encolado en `CustodyEventService.createEvent()` inmediatamente post-commit. Un job por evento. Latencia típica < 5 segundos.
+
+**Consecuencias:**
+- Facilita: detección de fraude casi en tiempo real, sin overhead de barrido periódico
+- Complica: si el GPS Provider real es push (no pull), el modelo debe cambiar a pub-sub
+- Criterio de revisión: al integrar `WinlogAdapter` real, evaluar si Winlog ofrece canal push; si sí, migrar a suscripción
+
+---
+
 ## Plantilla para nuevas ADRs
 
 ```markdown

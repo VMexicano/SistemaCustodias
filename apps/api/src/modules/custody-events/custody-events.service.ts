@@ -88,6 +88,7 @@ export class CustodyEventService {
     private readonly alertsQueue: Queue,
     private readonly hmacSecret: string,
     private readonly db: Knex,
+    private readonly monitorQueue: Queue,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -194,6 +195,12 @@ export class CustodyEventService {
         actorId,
       });
     }
+
+    // 9. Enqueue Monitor Engine verification (Sprint 15 — ADR-025)
+    await this.monitorQueue.add('process-event', {
+      eventId: event.id,
+      orderId,
+    });
 
     return toEventDTO(event, true);
   }

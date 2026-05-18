@@ -1,6 +1,6 @@
 # project-index.md — SistemaCustodias
 > Leer PRIMERO en cada sesión. Fuente de verdad del proyecto.
-> Última actualización: 2026-05-18 — Sprint 14 (CustodyEvent Envelope) completado. event_catalog (M-055) + order_event (M-056) + seed 15 aplicados. Módulo custody-events: GET /orders/:id/event-catalog, POST /orders/:id/events, GET /orders/:id/events. CustodyEventService 100% cobertura. ADR-022 + ADR-023.
+> Última actualización: 2026-05-18 — Sprint 15 (Monitor Engine) completado. IGpsProvider + MockGpsAdapter + MonitorEngine (4 fraud checks: timestamp delta, integrity hash, mock GPS). BullMQ event-driven. ADR-024 + ADR-025. 30 tests 100% cobertura. event_catalog (M-055) + order_event (M-056) + seed 15 aplicados. Módulo custody-events: GET /orders/:id/event-catalog, POST /orders/:id/events, GET /orders/:id/events. CustodyEventService 100% cobertura. ADR-022 + ADR-023.
 
 ---
 
@@ -67,6 +67,7 @@ Agregar un nuevo tipo = solo un INSERT en `custody_types`. Sin cambios de códig
 | 12 | `admin` | ✅ Sprint 12 | Dashboard web: 4 páginas custody + assign/reassign modal + alerts badge + operator names via JOIN |
 | 13 | `compliance` | ✅ Sprint 10 | Cadena de custodia, firmas digitales, reportes auditables + PDF, SHA-256, 28 tests |
 | 14 | `custody-events` | ✅ Sprint 14 | event_catalog por vertical, CustodyEvent envelope, HMAC-SHA256 integrity_hash, Ajv payload validation, 40 tests 100% |
+| 15 | `monitor-engine` | ✅ Sprint 15 | IGpsProvider + MockGpsAdapter, MonitorEngine (timestamp delta, integrity hash, mock GPS), BullMQ event-driven, 30 tests 100% |
 
 ## Migraciones aplicadas
 
@@ -341,6 +342,8 @@ order_event (
 | ADR-021 | custody-routing: haversine polyline + AVG_SPEED 60kmh + geofence fallback a ruta planificada | ✅ Vigente |
 | ADR-022 | integrity_hash calculado por servidor (HMAC-SHA256) — no confiar en valor del cliente | ✅ Vigente |
 | ADR-023 | event_catalog keyed por (vertical_slug, code) — extensible por vertical sin cambios de código | ✅ Vigente |
+| ADR-024 | CAS en order_event.auto_timestamp: UPDATE WHERE IS NULL — excepción controlada al append-only | ✅ Vigente |
+| ADR-025 | MonitorEngine event-driven (no cron): un BullMQ job por evento, latencia < 5s | ✅ Vigente |
 
 ---
 

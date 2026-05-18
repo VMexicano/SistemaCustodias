@@ -128,6 +128,11 @@ import { custodyRoutingRoutes } from './modules/custody-routing/custody-routing.
 import { CustodyEventsRepository } from './modules/custody-events/custody-events.repository.js';
 import { CustodyEventService } from './modules/custody-events/custody-events.service.js';
 import { custodyEventsRoutes } from './modules/custody-events/custody-events.routes.js';
+import { MockGpsAdapter } from './shared/gps/mock-gps.adapter.js';
+import { MonitorRepository } from './modules/monitor-engine/monitor-engine.repository.js';
+import { MonitorEngine } from './modules/monitor-engine/monitor-engine.service.js';
+import { createMonitorEngineQueue } from './modules/monitor-engine/monitor-engine.queue.js';
+import { registerMonitorEngineWorker } from './modules/monitor-engine/monitor-engine.worker.js';
 
 function parseCorsOrigins(corsOrigin: string): string[] {
   return corsOrigin
@@ -560,6 +565,18 @@ export async function buildApp() {
   // Dependency wiring — custody-events module (Sprint 14)
   // ---------------------------------------------------------------------------
 
+  // Monitor Engine (Sprint 15 — ADR-025)
+  const monitorEngineQueue = createMonitorEngineQueue(redis);
+  const monitorRepo = new MonitorRepository(db);
+  const mockGpsAdapter = new MockGpsAdapter();
+  const monitorEngine = new MonitorEngine(
+    monitorRepo,
+    mockGpsAdapter,
+    custodyNotificationsQueue,
+    env.CUSTODY_EVENT_HMAC_SECRET,
+  );
+  registerMonitorEngineWorker(monitorEngine, redis);
+
   const custodyEventsRepo = new CustodyEventsRepository(db);
   const custodyEventService = new CustodyEventService(
     custodyEventsRepo,
@@ -567,6 +584,7 @@ export async function buildApp() {
     custodyNotificationsQueue,
     env.CUSTODY_EVENT_HMAC_SECRET,
     db,
+    monitorEngineQueue,
   );
   await app.register(custodyEventsRoutes, {
     prefix: '/orders',
