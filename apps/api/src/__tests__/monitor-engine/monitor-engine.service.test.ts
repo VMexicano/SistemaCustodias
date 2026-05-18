@@ -670,3 +670,213 @@ describe('processEvent — escenarios completos', () => {
     );
   });
 });
+
+// ===========================================================================
+// Casos edge — actor_id, actor_role, event_type
+// ===========================================================================
+
+describe('processEvent — casos edge: actor_id / actor_role / event_type', () => {
+  it('actor_id null → la alerta se crea con actorId: null', async () => {
+    const event = buildValidEvent({ actor_id: null, integrity_hash: 'a'.repeat(64) });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockRejectedValue(new Error('GPS offline'));
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    expect(mockAlertsQueue.add).toHaveBeenCalledWith(
+      'create-alert',
+      expect.objectContaining({ actorId: null }),
+    );
+  });
+
+  it('actor_role copiloto → hash calculado correctamente, sin falso positivo', async () => {
+    const event = buildValidEvent({ actor_role: 'copiloto' });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockResolvedValue(new Date('2026-05-18T12:00:30.000Z'));
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    const hashAlerts = (mockAlertsQueue.add as jest.Mock).mock.calls.filter(
+      ([, data]) => (data as Record<string, unknown>).description === 'integrity_hash_mismatch',
+    );
+    expect(hashAlerts).toHaveLength(0);
+  });
+
+  it('actor_role supervisor → hash calculado correctamente, sin falso positivo', async () => {
+    const event = buildValidEvent({ actor_role: 'supervisor' });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockRejectedValue(new Error('GPS offline'));
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    const hashAlerts = (mockAlertsQueue.add as jest.Mock).mock.calls.filter(
+      ([, data]) => (data as Record<string, unknown>).description === 'integrity_hash_mismatch',
+    );
+    expect(hashAlerts).toHaveLength(0);
+  });
+
+  it('event_type PANIC → MonitorEngine procesa todos los checks de fraude normalmente', async () => {
+    const event = buildValidEvent({ event_type: 'PANIC' });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockResolvedValue(new Date('2026-05-18T12:00:30.000Z'));
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    // PANIC event with valid hash, no mock_location, small delta → 0 alertas
+    expect(mockAlertsQueue.add).not.toHaveBeenCalled();
+  });
+
+  it('evento PANIC con hash incorrecto → alerta integrity_hash_mismatch (no omite el check)', async () => {
+    const event = buildValidEvent({ event_type: 'PANIC', integrity_hash: 'a'.repeat(64) });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockRejectedValue(new Error('GPS offline'));
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    expect(mockAlertsQueue.add).toHaveBeenCalledWith(
+      'create-alert',
+      expect.objectContaining({ description: 'integrity_hash_mismatch' }),
+    );
+  });
+
+  it('event_type modificado en BD (tamper) → hash no coincide → alerta de integridad', async () => {
+    // Hash was computed for event_type='CHECKPOINT', but DB row has event_type='DELIVERED'
+    const originalEvent = buildValidEvent({ event_type: 'CHECKPOINT' });
+    const tamperedEvent = { ...originalEvent, event_type: 'DELIVERED' }; // hash still for CHECKPOINT
+    mockRepo.findEventById.mockResolvedValue(tamperedEvent);
+    mockGpsProvider.getAutoTimestamp.mockRejectedValue(new Error('GPS offline'));
+    const engine = makeEngine();
+
+    await engine.processEvent(tamperedEvent.id);
+
+    expect(mockAlertsQueue.add).toHaveBeenCalledWith(
+      'create-alert',
+      expect.objectContaining({ description: 'integrity_hash_mismatch' }),
+    );
+  });
+});
+
+// ===========================================================================
+// Casos edge — timestamp delta
+// ===========================================================================
+
+describe('checkTimestampDelta — casos edge de precisión', () => {
+  it('delta = 0 ms (timestamps idénticos) → sin alerta', async () => {
+    const ts = new Date('2026-05-18T12:00:00.000Z');
+    const event = buildValidEvent({ app_timestamp: ts });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockResolvedValue(ts); // same millisecond
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    expect(mockAlertsQueue.add).not.toHaveBeenCalled();
+  });
+
+  it('delta = 1 ms → sin alerta (bien por debajo del umbral)', async () => {
+    const appTs = new Date('2026-05-18T12:00:00.000Z');
+    const autoTs = new Date(appTs.getTime() + 1);
+    const event = buildValidEvent({ app_timestamp: appTs });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockResolvedValue(autoTs);
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    expect(mockAlertsQueue.add).not.toHaveBeenCalled();
+  });
+
+  it('delta = 180 001 ms (1 ms sobre el umbral) → alerta, descripción muestra 180s', async () => {
+    const appTs = new Date('2026-05-18T12:00:00.000Z');
+    const autoTs = new Date(appTs.getTime() + 180_001); // 180.001 s → Math.round = 180s
+    const event = buildValidEvent({ app_timestamp: appTs });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockResolvedValue(autoTs);
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    expect(mockAlertsQueue.add).toHaveBeenCalledWith(
+      'create-alert',
+      expect.objectContaining({
+        type: 'tamper',
+        description: 'Timestamp delta 180s exceeds 3 min threshold',
+      }),
+    );
+  });
+
+  it('delta = 86 400 s (24 h) → alerta con descripción correcta', async () => {
+    const appTs = new Date('2026-05-18T12:00:00.000Z');
+    const autoTs = new Date(appTs.getTime() + 86_400_000);
+    const event = buildValidEvent({ app_timestamp: appTs });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockResolvedValue(autoTs);
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    expect(mockAlertsQueue.add).toHaveBeenCalledWith(
+      'create-alert',
+      expect.objectContaining({
+        type: 'tamper',
+        description: 'Timestamp delta 86400s exceeds 3 min threshold',
+      }),
+    );
+  });
+});
+
+// ===========================================================================
+// Casos edge — campos de device y payload
+// ===========================================================================
+
+describe('processEvent — casos edge: device y payload', () => {
+  it('device con solo mock_location_detected (sin otros campos) → no rompe el hash', async () => {
+    const device = { mock_location_detected: false };
+    const event = buildValidEvent({ device });
+    // buildValidEvent computes hash with this minimal device object
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockRejectedValue(new Error('GPS offline'));
+    const engine = makeEngine();
+
+    await expect(engine.processEvent(event.id)).resolves.toBeUndefined();
+
+    const hashAlerts = (mockAlertsQueue.add as jest.Mock).mock.calls.filter(
+      ([, data]) => (data as Record<string, unknown>).description === 'integrity_hash_mismatch',
+    );
+    expect(hashAlerts).toHaveLength(0);
+  });
+
+  it('payload vacío {} → hash calculado correctamente, sin falso positivo', async () => {
+    const event = buildValidEvent({ payload: {} });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockRejectedValue(new Error('GPS offline'));
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    const hashAlerts = (mockAlertsQueue.add as jest.Mock).mock.calls.filter(
+      ([, data]) => (data as Record<string, unknown>).description === 'integrity_hash_mismatch',
+    );
+    expect(hashAlerts).toHaveLength(0);
+  });
+
+  it('location con objeto anidado → hash calculado correctamente', async () => {
+    const location = { lat: 19.4326, long: -99.1332, accuracy_meters: 10.5, provider: 'network', extra: { floor: 3 } };
+    const event = buildValidEvent({ location });
+    mockRepo.findEventById.mockResolvedValue(event);
+    mockGpsProvider.getAutoTimestamp.mockRejectedValue(new Error('GPS offline'));
+    const engine = makeEngine();
+
+    await engine.processEvent(event.id);
+
+    const hashAlerts = (mockAlertsQueue.add as jest.Mock).mock.calls.filter(
+      ([, data]) => (data as Record<string, unknown>).description === 'integrity_hash_mismatch',
+    );
+    expect(hashAlerts).toHaveLength(0);
+  });
+});
